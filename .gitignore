@@ -1,0 +1,33 @@
+# Vendored skill source — reconstructible from skills-lock.json
+# (archify is pinned there by repo + content hash, like node_modules/package-lock)
+.agents/
+
+# Machine-local Claude Code settings (contains absolute paths for this machine).
+# .claude/settings.json IS tracked if it ever appears; only *.local.json is not.
+.claude/settings.local.json
+
+# Symlink into .agents/ — would dangle on clone since .agents/ is ignored
+.claude/skills/
+
+# archify visual-check output — regenerable QA artifacts, ~1.3MB of PNGs
+*.visual-check.*.png
+*.visual-check.json
+*.visual-check.html
+
+# --- Checkly / Node, for when scaffolding lands here ---
+node_modules/
+.checkly/
+dist/
+*.tsbuildinfo
+
+# Never commit Checkly credentials
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

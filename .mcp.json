@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "astronomy-shop": {
+      "type": "http",
+      "url": "http://localhost:8011/mcp"
+    }
+  }
+}

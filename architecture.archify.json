@@ -1,0 +1,349 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "OpenTelemetry Astronomy Shop - Request and Telemetry Paths",
+    "output": "ARCHITECTURE.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "request-path",
+        "label": "Checkout request path",
+        "focus": [
+          "browser",
+          "proxy",
+          "frontend",
+          "checkout",
+          "payment"
+        ],
+        "note": "The flow a synthetic browser check exercises, edge to payment."
+      },
+      {
+        "id": "state",
+        "label": "Where state lives",
+        "focus": [
+          "cart",
+          "valkey",
+          "catalog",
+          "astrodb"
+        ],
+        "note": "Cart state in valkey, product catalog in Postgres."
+      },
+      {
+        "id": "telemetry",
+        "label": "Telemetry pipeline",
+        "focus": [
+          "frontend",
+          "checkout",
+          "collector",
+          "grafana"
+        ],
+        "note": "Every service exports OTLP to the collector, which fans out to the backends."
+      }
+    ],
+    "viewBox": [
+      1340,
+      500
+    ]
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Browser / Locust",
+      "sublabel": "real + generated traffic",
+      "pos": [
+        50,
+        255
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "proxy",
+      "type": "cloud",
+      "label": "frontend-proxy",
+      "sublabel": "Envoy :8080",
+      "pos": [
+        308,
+        255
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "tag": "only public port"
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "label": "frontend",
+      "sublabel": "Next.js + /api/* BFF",
+      "pos": [
+        576,
+        255
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "checkout",
+      "type": "backend",
+      "label": "checkout",
+      "sublabel": ":5050",
+      "pos": [
+        844,
+        255
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "tag": "fan-out hub"
+    },
+    {
+      "id": "payment",
+      "type": "backend",
+      "label": "payment",
+      "sublabel": ":50051",
+      "pos": [
+        1112,
+        255
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "flagd",
+      "type": "security",
+      "label": "flagd",
+      "sublabel": "feature flags :8013",
+      "pos": [
+        576,
+        90
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "tag": "failure injection"
+    },
+    {
+      "id": "cart",
+      "type": "backend",
+      "label": "cart",
+      "sublabel": ":7070",
+      "pos": [
+        844,
+        90
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "valkey",
+      "type": "database",
+      "label": "valkey-cart",
+      "sublabel": ":6379",
+      "pos": [
+        1112,
+        90
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "catalog",
+      "type": "backend",
+      "label": "product-catalog",
+      "sublabel": ":3550",
+      "pos": [
+        844,
+        425
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "astrodb",
+      "type": "database",
+      "label": "astronomy-db",
+      "sublabel": "PostgreSQL :5432",
+      "pos": [
+        1112,
+        425
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "collector",
+      "type": "cloud",
+      "label": "otel-collector",
+      "sublabel": "OTLP ingest",
+      "pos": [
+        576,
+        425
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "grafana",
+      "type": "cloud",
+      "label": "Grafana",
+      "sublabel": "Jaeger + Prometheus",
+      "pos": [
+        308,
+        425
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "tag": ":3000"
+    }
+  ],
+  "connections": [
+    {
+      "id": "browser-to-proxy",
+      "from": "browser",
+      "to": "proxy",
+      "label": "HTTPS :8080",
+      "variant": "emphasis"
+    },
+    {
+      "id": "proxy-to-frontend",
+      "from": "proxy",
+      "to": "frontend",
+      "label": "routes /"
+    },
+    {
+      "id": "frontend-to-checkout",
+      "from": "frontend",
+      "to": "checkout",
+      "label": "gRPC PlaceOrder",
+      "variant": "emphasis"
+    },
+    {
+      "id": "checkout-to-payment",
+      "from": "checkout",
+      "to": "payment",
+      "label": "gRPC Charge",
+      "variant": "emphasis"
+    },
+    {
+      "id": "frontend-to-cart",
+      "from": "frontend",
+      "to": "cart",
+      "label": "gRPC AddItem",
+      "fromSide": "top"
+    },
+    {
+      "id": "frontend-to-catalog",
+      "from": "frontend",
+      "to": "catalog",
+      "label": "gRPC ListProducts",
+      "toSide": "top"
+    },
+    {
+      "id": "cart-to-valkey",
+      "from": "cart",
+      "to": "valkey",
+      "label": "GET / SET"
+    },
+    {
+      "id": "catalog-to-astrodb",
+      "from": "catalog",
+      "to": "astrodb",
+      "label": "SQL"
+    },
+    {
+      "id": "flagd-to-frontend",
+      "from": "flagd",
+      "to": "frontend",
+      "label": "flag evaluation",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 72
+    },
+    {
+      "id": "frontend-otlp",
+      "from": "frontend",
+      "to": "collector",
+      "label": "OTLP",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 73
+    },
+    {
+      "id": "catalog-otlp",
+      "from": "catalog",
+      "to": "collector",
+      "label": "OTLP",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "collector-to-grafana",
+      "from": "collector",
+      "to": "grafana",
+      "label": "traces + metrics"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Edge",
+      "items": [
+        "Envoy frontend-proxy is the only public port (:8080)",
+        "Next.js frontend serves the pages and the /api/* BFF"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Core services",
+      "items": [
+        "checkout fans out to cart, currency, email, payment, product-catalog and shipping",
+        "Cart state lives in valkey; the catalog in Postgres",
+        "Also running: ad, currency, email, shipping, quote, recommendation, image-provider"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Telemetry",
+      "items": [
+        "Every service exports OTLP to otel-collector",
+        "Collector fans out to Jaeger, Prometheus and OpenSearch"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Monitoring notes",
+      "items": [
+        "flagd injects deliberate failures - expect synthetic checks to alert",
+        "Checkly cloud checkers cannot reach localhost - use a private location",
+        "Agent layer (chatbot, agent, mcp) is mapped in MCP-ARCHITECTURE.html"
+      ]
+    }
+  ]
+}
