@@ -16,24 +16,35 @@ under docker compose (full stack: `compose.yaml` + `full` + `observability` +
 `extras` + `agent`). See `ARCHITECTURE.html` for the shop topology and
 `MCP-ARCHITECTURE.html` for the agent/MCP layer.
 
+**Prefer the `:8080` routes.** Envoy fronts most UIs on the always-stable app port,
+so these never move:
+
 | What | Where |
 |---|---|
-| App (frontend-proxy / Envoy) | http://localhost:8080 |
-| Grafana | :3000 (under `/grafana`) |
-| Jaeger UI | :16686 (under `/jaeger/ui`) |
-| OpenSearch | :9200 |
-| Prometheus | :9090 |
-| MCP server | :8011 |
-| Load generator (Locust) | :8089 |
-| flagd UI | :4000 |
+| App | http://localhost:8080 |
+| Grafana | http://localhost:8080/grafana/ |
+| Jaeger UI | http://localhost:8080/jaeger/ui |
+| Load generator (Locust) | http://localhost:8080/loadgen/ |
+| flagd UI | http://localhost:8080/feature |
+| Telemetry docs | http://localhost:8080/telemetry/ |
+| Chatbot (Gradio) | http://localhost:8080/chatbot/ |
+
+Envoy has **no** route for the MCP server, OpenSearch or Prometheus, so those need
+direct ports — pinned by `compose.ports.yaml` (Prometheus pins itself upstream):
+
+| What | Where |
+|---|---|
+| MCP server | http://localhost:8011/mcp |
+| OpenSearch | http://localhost:9200 |
+| Prometheus | http://localhost:9090 |
+| Grafana (direct) | :3000 · Jaeger (direct) :16686 — handy for API calls |
 | Envoy admin | :10000 |
 
-Ports come from `../opentelemetry-demo/.env` (`ENVOY_PORT`, etc.), but **only the
-ones above are stable** — Grafana, Jaeger, OpenSearch and MCP are pinned by
-`compose.ports.yaml`. Without it the demo declares them host-side-less
-(`ports: ["${GRAFANA_PORT}"]`) and Docker reassigns a random host port on every
-recreation: Grafana was observed moving 51903 → 60682 → 61391 in one session.
-Note Grafana and Jaeger serve under a path prefix — the bare host root 404s.
+Anything *not* pinned and *not* behind Envoy gets a **new random host port on every
+recreation** — the demo declares them host-side-less (`ports: ["${GRAFANA_PORT}"]`).
+Grafana was observed moving 51903 → 60682 → 61391 in a single session. If a direct
+port ever stops answering, re-resolve it with `docker port <service> <container-port>`
+rather than assuming an outage.
 
 **BFF routes** — `src/frontend/pages/api/`:
 `/api/products` · `/api/cart` · `/api/checkout` · `/api/currency` ·
@@ -47,6 +58,54 @@ Note Grafana and Jaeger serve under a path prefix — the bare host root 404s.
 | `66VCHSJNUP` | Starsense Explorer Refractor Telescope |
 | `L9ECAV7KIM` | Lens Cleaning Kit |
 | `HQTGWGPNH4` | The Comet Book |
+
+## Running the stack
+
+Everything needed to run the demo correctly lives **in the demo repo**, not here.
+The demo's entry point is its **Makefile**, not a compose invocation:
+
+```bash
+cd ../opentelemetry-demo
+make start-checkly     # the whole stack + agent/MCP + log retention
+make stop              # tears everything down
+```
+
+`make start-checkly` = `start-agentic` plus the retention policy. Use it rather
+than hand-rolling `docker compose -f ... -f ...`; the Makefile carries the right
+file list, the `--env-file .env --env-file .env.override` pair, and the local
+overrides below.
+
+| File (demo repo) | Does |
+|---|---|
+| `compose.memory.yaml` | Raises memory caps on 21 services |
+| `compose.ports.yaml` | Pins MCP, Grafana, Jaeger, OpenSearch host ports |
+| `opensearch-log-retention.sh` | ISM policy: delete `otel-logs-*` after 1 day |
+| `Makefile` → `DOCKER_COMPOSE_FILES_LOCAL` | Wires the two compose files into every target |
+
+The Makefile wiring matters: without it, `make start` would silently bring the
+stack up on upstream's caps and ephemeral ports, discarding all of the above.
+Opt out deliberately with `make start-agentic DOCKER_COMPOSE_FILES_LOCAL=`.
+
+**Do not add a `docker-compose.yml`.** Compose resolves `compose.yaml` with higher
+precedence, so a second entry point is silently ignored with only a warning
+(verified). The Makefile is the single source of truth.
+
+`compose.memory.yaml` exists because upstream tunes the caps so tight that several
+services run permanently against the ceiling — `flagd` at 98%, `accounting` 95%,
+`kafka` 94% — and Grafana at 175M thrashed its GC hard enough to burn ~11 cores
+and serve API calls in 67s (0.1s after the bump). None of this is Checkly work;
+it is just the basis for running things correctly locally.
+
+**OpenSearch has no volume.** Its log data *and* the ISM retention policy live in
+the container layer, so `docker compose up` wipes both — re-run the script after.
+Log history never survives a restart, independent of retention.
+
+**Watch the disk, not the logs.** On 2026-09-12 logs silently stopped for ~12h:
+the Docker VM hit 97%, OpenSearch crossed its flood-stage watermark and set
+`index.blocks.read_only_allow_delete`, so the collector dropped every record with
+"sending queue is full". The culprit was Docker build cache + images (54 GB), not
+log volume (1 MB). `docker builder prune -f` freed 11.1 GB and it recovered.
+Logs grow at only ~0.78 GiB/day.
 
 ## Checkly cannot reach `localhost`
 
@@ -124,42 +183,6 @@ The demo ships its own MCP server. `.mcp.json` in this repo points at it:
 **Port is pinned by us.** `compose.agent.yaml` declares `ports: ["${MCP_PORT}"]` with no
 host side, so Docker assigns a *new ephemeral port on every restart*. `compose.ports.yaml`
 pins it to `8011:8011`, along with Grafana, Jaeger and OpenSearch.
-
-## Running the stack
-
-Everything needed to run the demo correctly lives **in the demo repo**, not here:
-
-```bash
-cd ../opentelemetry-demo
-docker compose -p opentelemetry-demo \
-  -f compose.yaml -f compose.full.yaml -f compose.observability.yaml \
-  -f compose.extras.yaml -f compose.agent.yaml \
-  -f compose.memory.yaml -f compose.ports.yaml up -d
-./opensearch-log-retention.sh      # re-run after every up — see below
-```
-
-| File | Does |
-|---|---|
-| `compose.memory.yaml` | Raises memory caps on 21 services |
-| `compose.ports.yaml` | Pins MCP, Grafana, Jaeger, OpenSearch host ports |
-| `opensearch-log-retention.sh` | ISM policy: delete `otel-logs-*` after 1 day |
-
-`compose.memory.yaml` exists because upstream tunes the caps so tight that several
-services run permanently against the ceiling — `flagd` at 98%, `accounting` 95%,
-`kafka` 94% — and Grafana at 175M thrashed its GC hard enough to burn ~11 cores
-and serve API calls in 67s (0.1s after the bump). None of this is Checkly work;
-it is just the basis for running things correctly locally.
-
-**OpenSearch has no volume.** Its log data *and* the ISM retention policy live in
-the container layer, so `docker compose up` wipes both — re-run the script after.
-Log history never survives a restart, independent of retention.
-
-**Watch the disk, not the logs.** On 2026-09-12 logs silently stopped for ~12h:
-the Docker VM hit 97%, OpenSearch crossed its flood-stage watermark and set
-`index.blocks.read_only_allow_delete`, so the collector dropped every record with
-"sending queue is full". The culprit was Docker build cache + images (54 GB), not
-log volume (1 MB). `docker builder prune -f` freed 11.1 GB and it recovered.
-Logs grow at only ~0.78 GiB/day.
 
 If the URL ever stops working, `docker port mcp 8011` shows the current mapping.
 Envoy has **no** `/mcp` route — `/chatbot/` reaches the Gradio UI, not the MCP server.
