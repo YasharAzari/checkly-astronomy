@@ -13,8 +13,18 @@ There is no scaffolding here yet, and that is deliberate. Project setup — `che
 
 The OTel Astronomy Shop demo, cloned at `../opentelemetry-demo` and already running
 under docker compose (full stack: `compose.yaml` + `full` + `observability` +
-`extras` + `agent`). See `ARCHITECTURE.html` for the shop topology and
-`MCP-ARCHITECTURE.html` for the agent/MCP layer.
+`extras` + `agent`).
+
+**All documentation about the demo lives in [`docs/`](docs/)** — it describes the system
+under test, not our checks. Start at [`docs/README.md`](docs/README.md):
+
+| Doc | Covers |
+|---|---|
+| `docs/01-stack-architecture.md` | 31 services, languages, ports, dependency graph, flagd fault injection |
+| `docs/02-telemetry-pipeline.md` | Collector receivers/exporters, the three backends, Grafana, known failure modes |
+| `docs/03-public-endpoints.md` | **The synthetic-test surface** — every customer-reachable URL, contracts, measured baselines |
+| `docs/04-agent-mcp-chatbot.md` | Agent/MCP/chatbot, the `MCP_ENABLED` toggle, and the VCR-replay LLM story |
+| `docs/diagrams/*.html` | Rendered diagrams; sources in `docs/diagrams/src/` |
 
 **Prefer the `:8080` routes.** Envoy fronts most UIs on the always-stable app port,
 so these never move:
@@ -137,19 +147,10 @@ Playwright Check Suites need Checkly Agent **6.0.3+** and an agent container wit
 
 ## Selector convention
 
-The demo already has Cypress specs in `src/frontend/cypress/e2e/`. They select via
-`[data-cy="..."]`, wrapped in `getElementByField(CypressFields.X)`
-(`src/frontend/utils/Cypress.ts`), with names enumerated in
-`src/frontend/utils/enums/CypressFields.ts`:
-
-`product-card` · `product-list` · `product-price` · `cart-icon` · `cart-item-count` ·
-`cart-go-to-shopping` · `checkout-place-order` · `checkout-item` · `currency-switcher`
-
-**Reuse these in browser checks** rather than inventing selectors — they are maintained
-by the demo and survive its UI changes.
-
-`src/frontend/cypress/e2e/Checkout.cy.ts` already walks the happy path
-(home → product → add to cart → place order) and is the model for a checkout browser check.
+Reuse the demo's own `[data-cy="..."]` attributes rather than inventing selectors — they
+are maintained by the demo and survive its UI changes. Names and the Cypress happy-path
+spec to model a browser check on are listed in
+[`docs/03-public-endpoints.md`](docs/03-public-endpoints.md).
 
 ## Checkly CLI
 
@@ -166,59 +167,19 @@ alert channels (`EmailAlertChannel`, `SlackAlertChannel`, `WebhookAlertChannel`)
 
 ## MCP server (`astronomy-shop`)
 
-The demo ships its own MCP server. `.mcp.json` in this repo points at it:
+`.mcp.json` in this repo points at the demo's own MCP server:
 
 ```json
 { "mcpServers": { "astronomy-shop": { "type": "http", "url": "http://localhost:8011/mcp" } } }
 ```
 
-- **Service**: `src/mcp`, Python 3.14 + [FastMCP](https://github.com/jlowin/fastmcp),
-  streamable HTTP transport at `/mcp`, server name `astronomy-shop-mcp`.
-- **Only exists with the agent layer** — `agent`, `mcp` and `chatbot` are defined in
-  `compose.agent.yaml`, not `compose.yaml`.
-- **Tools only.** It advertises `prompts` and `resources` capabilities, but both list
-  empty — those are FastMCP defaults. Ten tools, registered explicitly in
-  `astronomy_shop_mcp_server.py`.
+Ten tools, each a thin wrapper over the same `/api/*` BFF routes the checks target —
+so it is a convenient way to *drive* those endpoints while building checks.
 
-**Port is pinned by us.** `compose.agent.yaml` declares `ports: ["${MCP_PORT}"]` with no
-host side, so Docker assigns a *new ephemeral port on every restart*. `compose.ports.yaml`
-pins it to `8011:8011`, along with Grafana, Jaeger and OpenSearch.
+**Full detail in [`docs/04-agent-mcp-chatbot.md`](docs/04-agent-mcp-chatbot.md)**: the
+`MCP_ENABLED=False` default (the agent never calls the MCP server as shipped), the
+VCR-replay LLM story, and two real bugs in the shared tool layer.
 
-If the URL ever stops working, `docker port mcp 8011` shows the current mapping.
-Envoy has **no** `/mcp` route — `/chatbot/` reaches the Gradio UI, not the MCP server.
-
-### The MCP_ENABLED toggle
-
-The agent takes its tools from one of two places (`src/agent/src/agents/agents.py`):
-
-| `MCP_ENABLED` | Agent tool source |
-|---|---|
-| `False` *(demo default, and what is running)* | LangChain `@tool` functions bound in-process |
-| `True` | MCP session to `mcp:8011/mcp`, adapted by `load_mcp_tools()` |
-
-Both paths serve **the same ten tools** — `src/shared/tools.py` is `COPY`ed into both the
-`agent` and `mcp` images at build time. So the MCP server is a swappable *delivery
-mechanism*, not a different feature set. The container runs either way; with
-`MCP_ENABLED=False` the agent simply never calls it.
-
-### Why this matters for the Checkly work
-
-Every MCP tool is a thin wrapper over the same `/api/*` BFF routes the checks target:
-
-| Tool | Calls |
-|---|---|
-| `list_products` / `get_product` | `/api/products`, `/api/products/{id}` |
-| `add_to_cart` / `get_cart` / `empty_cart` | `/api/cart` |
-| `checkout` | `/api/checkout` |
-| `get_recommendations` | `/api/recommendations` |
-| `get_shipping_quote` | `/api/shipping` |
-| `get_supported_currencies` | `/api/currency` |
-| `get_ads` | `/api/data` |
-
-So the MCP server is a convenient way to *exercise and inspect* the exact endpoints the
-API checks will monitor — drive a cart or a checkout through it, then assert the same
-routes from Checkly.
-
-**Note on the demo's own docs**: `src/mcp/README.md` is stale in two places — it says mcp
-`depends_on: agent` (the reverse is true) and that the Dockerfile copies
-`src/agent/src/agents/tools.py` (it copies `src/shared/tools.py`).
+⚠️ **Do not use the `get_cart` tool to verify state.** It sends `user_id` where the BFF
+reads `sessionId`, so it always returns an empty cart with HTTP 200. Query
+`http://localhost:8080/api/cart?sessionId=…` directly instead.

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "OpenTelemetry Astronomy Shop - Request and Telemetry Paths",
+    "title": "OpenTelemetry Astronomy Shop \u2014 Request Paths",
     "output": "ARCHITECTURE.html",
     "quality_profile": "showcase",
     "views": [
@@ -36,9 +36,9 @@
           "frontend",
           "checkout",
           "collector",
-          "grafana"
+          "backends"
         ],
-        "note": "Every service exports OTLP to the collector, which fans out to the backends."
+        "note": "Services export OTLP to the collector, which fans out to three separate backends."
       }
     ],
     "viewBox": [
@@ -205,19 +205,19 @@
       ]
     },
     {
-      "id": "grafana",
-      "type": "cloud",
-      "label": "Grafana",
-      "sublabel": "Jaeger + Prometheus",
+      "id": "backends",
+      "type": "database",
+      "label": "telemetry backends",
+      "sublabel": "Jaeger \u00b7 Prometheus \u00b7 OpenSearch",
       "pos": [
         308,
         425
       ],
       "size": [
-        160,
+        190,
         60
       ],
-      "tag": ":3000"
+      "tag": "see TELEMETRY"
     }
   ],
   "connections": [
@@ -304,10 +304,10 @@
       "toSide": "right"
     },
     {
-      "id": "collector-to-grafana",
+      "id": "collector-to-backends",
       "from": "collector",
-      "to": "grafana",
-      "label": "traces + metrics"
+      "to": "backends",
+      "label": "exports"
     }
   ],
   "cards": [
@@ -332,8 +332,10 @@
       "dot": "violet",
       "title": "Telemetry",
       "items": [
-        "Every service exports OTLP to otel-collector",
-        "Collector fans out to Jaeger, Prometheus and OpenSearch"
+        "Every service exports OTLP to otel-collector (:4317 gRPC / :4318 HTTP)",
+        "The collector also scrapes ad:9465 and pulls from valkey, postgres, kafka, nginx and docker",
+        "It fans out to three databases: Jaeger (traces), Prometheus (metrics), OpenSearch (logs)",
+        "Grafana only reads from those backends \u2014 it is not in the write path. See TELEMETRY.html"
       ]
     },
     {
