@@ -2,349 +2,1006 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "OpenTelemetry Astronomy Shop \u2014 Request Paths",
+    "title": "OpenTelemetry Astronomy Shop \u2014 Complete System",
     "output": "ARCHITECTURE.html",
-    "quality_profile": "showcase",
+    "quality_profile": "standard",
     "views": [
       {
-        "id": "request-path",
-        "label": "Checkout request path",
+        "id": "browse",
+        "label": "Browse path",
         "focus": [
           "browser",
           "proxy",
           "frontend",
-          "checkout",
-          "payment"
+          "catalog",
+          "recommendation",
+          "ad"
         ],
-        "note": "The flow a synthetic browser check exercises, edge to payment."
+        "note": "Home and product pages: catalogue, recommendations, ads."
       },
       {
-        "id": "state",
-        "label": "Where state lives",
+        "id": "checkout",
+        "label": "Checkout fan-out",
         "focus": [
-          "cart",
-          "valkey",
-          "catalog",
-          "astrodb"
+          "checkout",
+          "payment",
+          "email",
+          "shipping",
+          "quote",
+          "kafka"
         ],
-        "note": "Cart state in valkey, product catalog in Postgres."
+        "note": "Seven services synchronously, then a publish to Kafka."
+      },
+      {
+        "id": "agent",
+        "label": "Agent / MCP layer",
+        "focus": [
+          "chatbot",
+          "agent",
+          "mcp"
+        ],
+        "note": "Not linked from the storefront; MCP_ENABLED=False so the agent never calls mcp."
       },
       {
         "id": "telemetry",
         "label": "Telemetry pipeline",
         "focus": [
-          "frontend",
-          "checkout",
           "collector",
-          "backends"
+          "jaeger",
+          "prometheus",
+          "opensearch",
+          "grafana"
         ],
-        "note": "Services export OTLP to the collector, which fans out to three separate backends."
+        "note": "Every service exports OTLP; the collector fans out to three databases; Grafana only reads."
       }
-    ],
-    "viewBox": [
-      1340,
-      500
     ]
   },
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "every one of these exports OTLP to otel-collector",
+      "wraps": [
+        "catalog",
+        "cart",
+        "currency",
+        "recommendation",
+        "ad",
+        "shipping",
+        "checkout"
+      ],
+      "pad": 12
+    }
+  ],
   "components": [
     {
       "id": "browser",
       "type": "external",
-      "label": "Browser / Locust",
-      "sublabel": "real + generated traffic",
+      "label": "Browser",
+      "sublabel": "real customer",
       "pos": [
-        50,
-        255
+        30,
+        150
       ],
       "size": [
-        150,
-        64
+        120,
+        46
+      ]
+    },
+    {
+      "id": "loadgen",
+      "type": "external",
+      "label": "load-generator",
+      "sublabel": "Locust :8089",
+      "pos": [
+        30,
+        226
+      ],
+      "size": [
+        120,
+        46
       ]
     },
     {
       "id": "proxy",
-      "type": "cloud",
+      "type": "frontend",
       "label": "frontend-proxy",
-      "sublabel": "Envoy :8080",
+      "sublabel": "Envoy :8080 \u2014 only public door",
       "pos": [
-        308,
-        255
+        186,
+        150
       ],
       "size": [
-        160,
-        64
+        150,
+        46
+      ]
+    },
+    {
+      "id": "imageprovider",
+      "type": "frontend",
+      "label": "image-provider",
+      "sublabel": "nginx :8081",
+      "pos": [
+        186,
+        46
       ],
-      "tag": "only public port"
+      "size": [
+        150,
+        46
+      ]
+    },
+    {
+      "id": "flagdui",
+      "type": "frontend",
+      "label": "flagd-ui",
+      "sublabel": "Elixir, /feature",
+      "pos": [
+        186,
+        226
+      ],
+      "size": [
+        150,
+        46
+      ]
+    },
+    {
+      "id": "telemetrydocs",
+      "type": "frontend",
+      "label": "telemetry-docs",
+      "sublabel": "Weaver docs",
+      "pos": [
+        186,
+        302
+      ],
+      "size": [
+        150,
+        46
+      ]
     },
     {
       "id": "frontend",
       "type": "frontend",
       "label": "frontend",
-      "sublabel": "Next.js + /api/* BFF",
+      "sublabel": "Next.js \u2014 UI + /api BFF",
       "pos": [
-        576,
-        255
+        372,
+        150
       ],
       "size": [
-        160,
-        64
-      ]
-    },
-    {
-      "id": "checkout",
-      "type": "backend",
-      "label": "checkout",
-      "sublabel": ":5050",
-      "pos": [
-        844,
-        255
-      ],
-      "size": [
-        160,
-        64
-      ],
-      "tag": "fan-out hub"
-    },
-    {
-      "id": "payment",
-      "type": "backend",
-      "label": "payment",
-      "sublabel": ":50051",
-      "pos": [
-        1112,
-        255
-      ],
-      "size": [
-        150,
-        64
+        156,
+        50
       ]
     },
     {
       "id": "flagd",
       "type": "security",
       "label": "flagd",
-      "sublabel": "feature flags :8013",
+      "sublabel": "flags :8013 \u2014 fault injection",
       "pos": [
-        576,
-        90
+        372,
+        290
       ],
       "size": [
-        160,
-        60
-      ],
-      "tag": "failure injection"
-    },
-    {
-      "id": "cart",
-      "type": "backend",
-      "label": "cart",
-      "sublabel": ":7070",
-      "pos": [
-        844,
-        90
-      ],
-      "size": [
-        160,
-        60
-      ]
-    },
-    {
-      "id": "valkey",
-      "type": "database",
-      "label": "valkey-cart",
-      "sublabel": ":6379",
-      "pos": [
-        1112,
-        90
-      ],
-      "size": [
-        150,
-        60
+        156,
+        46
       ]
     },
     {
       "id": "catalog",
       "type": "backend",
       "label": "product-catalog",
-      "sublabel": ":3550",
+      "sublabel": "Go \u00b7 gRPC :3550",
       "pos": [
-        844,
-        425
+        564,
+        46
       ],
       "size": [
-        160,
-        60
+        148,
+        44
+      ]
+    },
+    {
+      "id": "cart",
+      "type": "backend",
+      "label": "cart",
+      "sublabel": ".NET \u00b7 gRPC :7070",
+      "pos": [
+        564,
+        104
+      ],
+      "size": [
+        148,
+        44
+      ]
+    },
+    {
+      "id": "currency",
+      "type": "backend",
+      "label": "currency",
+      "sublabel": "C++ \u00b7 gRPC :7001",
+      "pos": [
+        564,
+        162
+      ],
+      "size": [
+        148,
+        44
+      ]
+    },
+    {
+      "id": "recommendation",
+      "type": "backend",
+      "label": "recommendation",
+      "sublabel": "Python \u00b7 gRPC :9001",
+      "pos": [
+        564,
+        220
+      ],
+      "size": [
+        148,
+        44
+      ]
+    },
+    {
+      "id": "ad",
+      "type": "backend",
+      "label": "ad",
+      "sublabel": "Java \u00b7 gRPC :9555 \u00b7 Prom :9465",
+      "pos": [
+        564,
+        278
+      ],
+      "size": [
+        148,
+        44
+      ]
+    },
+    {
+      "id": "shipping",
+      "type": "backend",
+      "label": "shipping",
+      "sublabel": "Rust \u00b7 HTTP :50050",
+      "pos": [
+        564,
+        336
+      ],
+      "size": [
+        148,
+        44
+      ]
+    },
+    {
+      "id": "checkout",
+      "type": "backend",
+      "label": "checkout",
+      "sublabel": "Go \u00b7 gRPC :5050 \u2014 orchestrator",
+      "pos": [
+        564,
+        400
+      ],
+      "size": [
+        156,
+        48
       ]
     },
     {
       "id": "astrodb",
       "type": "database",
       "label": "astronomy-db",
-      "sublabel": "PostgreSQL :5432",
+      "sublabel": "PostgreSQL 18",
       "pos": [
-        1112,
-        425
+        760,
+        46
+      ],
+      "size": [
+        148,
+        44
+      ]
+    },
+    {
+      "id": "valkey",
+      "type": "database",
+      "label": "valkey-cart",
+      "sublabel": "in-memory cart",
+      "pos": [
+        760,
+        104
+      ],
+      "size": [
+        148,
+        44
+      ]
+    },
+    {
+      "id": "quote",
+      "type": "backend",
+      "label": "quote",
+      "sublabel": "PHP \u00b7 HTTP :8090",
+      "pos": [
+        760,
+        336
+      ],
+      "size": [
+        148,
+        44
+      ]
+    },
+    {
+      "id": "payment",
+      "type": "backend",
+      "label": "payment",
+      "sublabel": "JS \u00b7 gRPC :50051",
+      "pos": [
+        760,
+        400
+      ],
+      "size": [
+        148,
+        44
+      ]
+    },
+    {
+      "id": "email",
+      "type": "backend",
+      "label": "email",
+      "sublabel": "Ruby \u00b7 HTTP :6060",
+      "pos": [
+        760,
+        458
+      ],
+      "size": [
+        148,
+        44
+      ]
+    },
+    {
+      "id": "kafka",
+      "type": "messagebus",
+      "label": "kafka",
+      "sublabel": "orders topic :9092",
+      "pos": [
+        956,
+        458
+      ],
+      "size": [
+        148,
+        44
+      ]
+    },
+    {
+      "id": "accounting",
+      "type": "backend",
+      "label": "accounting",
+      "sublabel": ".NET \u00b7 sums revenue",
+      "pos": [
+        1152,
+        400
       ],
       "size": [
         150,
-        60
+        44
+      ]
+    },
+    {
+      "id": "fraud",
+      "type": "backend",
+      "label": "fraud-detection",
+      "sublabel": "Kotlin \u00b7 flags orders",
+      "pos": [
+        1152,
+        458
+      ],
+      "size": [
+        150,
+        44
+      ]
+    },
+    {
+      "id": "chatbot",
+      "type": "frontend",
+      "label": "chatbot",
+      "sublabel": "Gradio, /chatbot/",
+      "pos": [
+        1340,
+        46
+      ],
+      "size": [
+        150,
+        44
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "cloud",
+      "label": "agent",
+      "sublabel": "LangGraph + VCR replay",
+      "pos": [
+        1340,
+        118
+      ],
+      "size": [
+        150,
+        44
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "cloud",
+      "label": "mcp",
+      "sublabel": "FastMCP :8011 \u2014 10 tools",
+      "pos": [
+        1340,
+        190
+      ],
+      "size": [
+        150,
+        44
       ]
     },
     {
       "id": "collector",
       "type": "cloud",
       "label": "otel-collector",
-      "sublabel": "OTLP ingest",
+      "sublabel": "contrib 0.159 \u2014 receives OTLP from every service; also scrapes ad and pulls valkey, postgres, kafka, nginx, docker",
       "pos": [
-        576,
-        425
+        30,
+        566
       ],
       "size": [
-        160,
-        60
+        1460,
+        52
       ]
     },
     {
-      "id": "backends",
+      "id": "jaeger",
       "type": "database",
-      "label": "telemetry backends",
-      "sublabel": "Jaeger \u00b7 Prometheus \u00b7 OpenSearch",
+      "label": "Jaeger 2.19",
+      "sublabel": "traces \u00b7 in-memory, 25k",
       "pos": [
-        308,
-        425
+        30,
+        664
       ],
       "size": [
-        190,
-        60
+        200,
+        46
+      ]
+    },
+    {
+      "id": "prometheus",
+      "type": "database",
+      "label": "Prometheus 3.13",
+      "sublabel": "metrics \u00b7 TSDB, 7 days",
+      "pos": [
+        268,
+        664
       ],
-      "tag": "see TELEMETRY"
+      "size": [
+        200,
+        46
+      ]
+    },
+    {
+      "id": "opensearch",
+      "type": "database",
+      "label": "OpenSearch",
+      "sublabel": "logs \u00b7 Lucene, no volume",
+      "pos": [
+        506,
+        664
+      ],
+      "size": [
+        200,
+        46
+      ]
+    },
+    {
+      "id": "grafana",
+      "type": "frontend",
+      "label": "Grafana 13.1",
+      "sublabel": "reads all three, stores none",
+      "pos": [
+        790,
+        664
+      ],
+      "size": [
+        200,
+        46
+      ]
+    },
+    {
+      "id": "opamp",
+      "type": "security",
+      "label": "opamp-server",
+      "sublabel": "collector health, WebSocket",
+      "pos": [
+        1060,
+        664
+      ],
+      "size": [
+        200,
+        46
+      ]
     }
   ],
   "connections": [
     {
-      "id": "browser-to-proxy",
+      "id": "r1",
       "from": "browser",
       "to": "proxy",
-      "label": "HTTPS :8080",
-      "variant": "emphasis"
+      "label": "HTTP :8080",
+      "variant": "emphasis",
+      "labelAt": [
+        168,
+        138
+      ]
     },
     {
-      "id": "proxy-to-frontend",
+      "id": "r2",
+      "from": "loadgen",
+      "to": "proxy",
+      "label": "simulated",
+      "labelAt": [
+        168,
+        290
+      ]
+    },
+    {
+      "id": "r3",
       "from": "proxy",
       "to": "frontend",
-      "label": "routes /"
-    },
-    {
-      "id": "frontend-to-checkout",
-      "from": "frontend",
-      "to": "checkout",
-      "label": "gRPC PlaceOrder",
+      "label": "/",
       "variant": "emphasis"
     },
     {
-      "id": "checkout-to-payment",
-      "from": "checkout",
-      "to": "payment",
-      "label": "gRPC Charge",
-      "variant": "emphasis"
+      "id": "r4",
+      "from": "proxy",
+      "to": "imageprovider",
+      "label": "/images/"
     },
     {
-      "id": "frontend-to-cart",
-      "from": "frontend",
-      "to": "cart",
-      "label": "gRPC AddItem",
-      "fromSide": "top"
+      "id": "r5",
+      "from": "proxy",
+      "to": "flagdui",
+      "label": "/feature",
+      "labelAt": [
+        261,
+        210
+      ]
     },
     {
-      "id": "frontend-to-catalog",
+      "id": "r6",
+      "from": "proxy",
+      "to": "telemetrydocs",
+      "label": "/telemetry/",
+      "fromSide": "right",
+      "toSide": "right",
+      "via": [
+        [
+          346,
+          173
+        ],
+        [
+          346,
+          325
+        ]
+      ],
+      "labelAt": [
+        380,
+        250
+      ]
+    },
+    {
+      "id": "r7",
+      "from": "proxy",
+      "to": "chatbot",
+      "label": "/chatbot/",
+      "fromSide": "right",
+      "toSide": "top",
+      "via": [
+        [
+          352,
+          173
+        ],
+        [
+          352,
+          18
+        ],
+        [
+          1415,
+          18
+        ]
+      ],
+      "labelAt": [
+        880,
+        10
+      ]
+    },
+    {
+      "id": "r8",
       "from": "frontend",
       "to": "catalog",
-      "label": "gRPC ListProducts",
-      "toSide": "top"
+      "label": "gRPC",
+      "labelAt": [
+        544,
+        68
+      ]
     },
     {
-      "id": "cart-to-valkey",
-      "from": "cart",
-      "to": "valkey",
-      "label": "GET / SET"
+      "id": "r9",
+      "from": "frontend",
+      "to": "cart",
+      "label": "gRPC",
+      "labelAt": [
+        544,
+        126
+      ]
     },
     {
-      "id": "catalog-to-astrodb",
+      "id": "r10",
+      "from": "frontend",
+      "to": "currency",
+      "label": "gRPC",
+      "labelAt": [
+        544,
+        184
+      ]
+    },
+    {
+      "id": "r11",
+      "from": "frontend",
+      "to": "recommendation",
+      "label": "gRPC",
+      "labelAt": [
+        544,
+        242
+      ]
+    },
+    {
+      "id": "r12",
+      "from": "frontend",
+      "to": "ad",
+      "label": "gRPC",
+      "labelAt": [
+        544,
+        300
+      ]
+    },
+    {
+      "id": "r13",
+      "from": "frontend",
+      "to": "shipping",
+      "label": "HTTP",
+      "labelAt": [
+        544,
+        358
+      ]
+    },
+    {
+      "id": "r14",
+      "from": "frontend",
+      "to": "checkout",
+      "label": "PlaceOrder",
+      "variant": "emphasis",
+      "labelAt": [
+        486,
+        470
+      ]
+    },
+    {
+      "id": "r15",
       "from": "catalog",
       "to": "astrodb",
       "label": "SQL"
     },
     {
-      "id": "flagd-to-frontend",
+      "id": "r16",
+      "from": "cart",
+      "to": "valkey",
+      "label": "R/W"
+    },
+    {
+      "id": "r17",
+      "from": "shipping",
+      "to": "quote",
+      "label": "HTTP"
+    },
+    {
+      "id": "r18",
+      "from": "checkout",
+      "to": "payment",
+      "label": "Charge"
+    },
+    {
+      "id": "r19",
+      "from": "checkout",
+      "to": "email",
+      "label": "HTTP",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "r20",
+      "from": "checkout",
+      "to": "kafka",
+      "label": "publish",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          642,
+          532
+        ],
+        [
+          1030,
+          532
+        ]
+      ],
+      "labelAt": [
+        836,
+        540
+      ]
+    },
+    {
+      "id": "r21",
+      "from": "kafka",
+      "to": "accounting",
+      "label": "consume"
+    },
+    {
+      "id": "r22",
+      "from": "kafka",
+      "to": "fraud",
+      "label": "consume"
+    },
+    {
+      "id": "r23",
       "from": "flagd",
       "to": "frontend",
-      "label": "flag evaluation",
-      "variant": "security",
-      "fromSide": "bottom",
-      "toSide": "top",
-      "labelDy": 72
+      "label": "flag eval",
+      "labelAt": [
+        430,
+        264
+      ]
     },
     {
-      "id": "frontend-otlp",
-      "from": "frontend",
+      "id": "r24",
+      "from": "chatbot",
+      "to": "agent",
+      "label": "HTTP",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1415,
+        104
+      ]
+    },
+    {
+      "id": "r25",
+      "from": "agent",
+      "to": "mcp",
+      "label": "MCP (off)",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1415,
+        176
+      ]
+    },
+    {
+      "id": "t1",
+      "from": "loadgen",
       "to": "collector",
       "label": "OTLP",
       "variant": "dashed",
       "fromSide": "bottom",
       "toSide": "top",
-      "labelDy": 73
+      "labelAt": [
+        90,
+        420
+      ]
     },
     {
-      "id": "catalog-otlp",
-      "from": "catalog",
+      "id": "t2",
+      "from": "telemetrydocs",
       "to": "collector",
       "label": "OTLP",
       "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        261,
+        452
+      ]
+    },
+    {
+      "id": "t3",
+      "from": "flagd",
+      "to": "collector",
+      "label": "OTLP",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        450,
+        452
+      ]
+    },
+    {
+      "id": "t4",
+      "from": "checkout",
+      "to": "collector",
+      "label": "OTLP",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        642,
+        502
+      ]
+    },
+    {
+      "id": "t5",
+      "from": "email",
+      "to": "collector",
+      "label": "OTLP",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        834,
+        515
+      ]
+    },
+    {
+      "id": "t6",
+      "from": "kafka",
+      "to": "collector",
+      "label": "OTLP",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1030,
+        512
+      ]
+    },
+    {
+      "id": "t7",
+      "from": "fraud",
+      "to": "collector",
+      "label": "OTLP",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1227,
+        535
+      ]
+    },
+    {
+      "id": "t8",
+      "from": "mcp",
+      "to": "collector",
+      "label": "OTLP",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1415,
+        400
+      ]
+    },
+    {
+      "id": "x1",
+      "from": "collector",
+      "to": "jaeger",
+      "label": "traces",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "x2",
+      "from": "collector",
+      "to": "prometheus",
+      "label": "metrics",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "x3",
+      "from": "collector",
+      "to": "opensearch",
+      "label": "logs",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "x4",
+      "from": "collector",
+      "to": "opamp",
+      "label": "health",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "x5",
+      "from": "grafana",
+      "to": "prometheus",
+      "label": "PromQL",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          890,
+          742
+        ],
+        [
+          368,
+          742
+        ]
+      ],
+      "labelAt": [
+        620,
+        750
+      ]
+    },
+    {
+      "id": "x6",
+      "from": "grafana",
+      "to": "opensearch",
+      "label": "PPL",
       "fromSide": "left",
       "toSide": "right"
     },
     {
-      "id": "collector-to-backends",
-      "from": "collector",
-      "to": "backends",
-      "label": "exports"
+      "id": "x7",
+      "from": "grafana",
+      "to": "jaeger",
+      "label": "traces",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          890,
+          772
+        ],
+        [
+          130,
+          772
+        ]
+      ],
+      "labelAt": [
+        480,
+        780
+      ]
     }
   ],
   "cards": [
     {
       "dot": "cyan",
-      "title": "Edge",
+      "title": "Edge and storefront",
       "items": [
-        "Envoy frontend-proxy is the only public port (:8080)",
-        "Next.js frontend serves the pages and the /api/* BFF"
-      ]
-    },
-    {
-      "dot": "emerald",
-      "title": "Core services",
-      "items": [
-        "checkout fans out to cart, currency, email, payment, product-catalog and shipping",
-        "Cart state lives in valkey; the catalog in Postgres",
-        "Also running: ad, currency, email, shipping, quote, recommendation, image-provider"
+        "Envoy :8080 is the only public door; only \"/\" and \"/images/\" are customer surface",
+        "checkout fans out to cart, catalog, currency, shipping, payment, email \u2014 shipping then calls quote"
       ]
     },
     {
       "dot": "violet",
-      "title": "Telemetry",
+      "title": "Agent layer \u2014 not in the storefront",
       "items": [
-        "Every service exports OTLP to otel-collector (:4317 gRPC / :4318 HTTP)",
-        "The collector also scrapes ad:9465 and pulls from valkey, postgres, kafka, nginx and docker",
-        "It fans out to three databases: Jaeger (traces), Prometheus (metrics), OpenSearch (logs)",
-        "Grafana only reads from those backends \u2014 it is not in the write path. See TELEMETRY.html"
+        "chatbot is a standalone Gradio UI; nothing in the shop links to it",
+        "MCP_ENABLED=False, so the agent uses in-process tools and never calls mcp (dashed)"
       ]
     },
     {
       "dot": "amber",
-      "title": "Monitoring notes",
+      "title": "Telemetry \u2014 every service, not only those drawn",
       "items": [
-        "flagd injects deliberate failures - expect synthetic checks to alert",
-        "Checkly cloud checkers cannot reach localhost - use a private location",
-        "Agent layer (chatbot, agent, mcp) is mapped in MCP-ARCHITECTURE.html"
+        "All 20+ services export OTLP; 8 representative edges are drawn, all of them would be unreadable",
+        "The collector also SCRAPES ad:9465 and pulls valkey, postgres, kafka, nginx, docker"
       ]
     }
   ]

@@ -1,38 +1,24 @@
-# Checkly Private Location agent — runs synthetic checks against the *local* demo.
-#
-#   cp ../.env.example ../.env    # paste the pl_... key into API_KEY
-#   docker compose up -d
-#   tail -f logs/agent.log
-#
-# Why an agent at all: Checkly's public checkers run in Checkly's cloud, outside
-# this machine, so they cannot reach anything here. Checks that target the local
-# stack must be pinned to this Private Location instead:
-#
-#     privateLocations: ['<slug>']     // ✅   not   locations: ['us-east-1']
-#
-# How to address the app *from inside this container*:
-#
-#     http://host.docker.internal:8080   the host's own localhost:8080   ← default
-#     http://frontend-proxy:8080         the demo container directly (see networks, bottom)
-#
-# `http://localhost:8080` resolves to the agent container itself and is never the app.
-
 name: checkly-private-location
+
+networks:
+  default:
+    name: checkly-private-location
+  opentelemetry-demo:
+    external: true
 
 services:
   agent:
     image: checkly/agent:latest
     container_name: checkly-agent
     restart: unless-stopped
+    networks:
+      - default
+      - opentelemetry-demo
     env_file:
       - ../.env
-
     environment:
       CHECKLY_API_KEY: ""
       CHECKLY_ACCOUNT_ID: ""
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
     volumes:
       - ./logs:/var/log/checkly
     entrypoint: ["/usr/bin/tini", "-g", "--", "/bin/bash", "-c"]
@@ -51,41 +37,3 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-  # Keeps logs/agent.log bounded. A sidecar rather than something baked into the
-  # agent container, so the agent image stays exactly as Checkly ships it.
-  # Rotation policy is infrastructure, not a secret — tune it here, not in .env.
-  log-rotator:
-    image: alpine:3.22
-    container_name: checkly-agent-log-rotator
-    restart: unless-stopped
-    depends_on:
-      - agent
-    environment:
-      LOG_FILE: /var/log/checkly/agent.log
-      MAX_BYTES: "10485760"   # rotate once the live log passes 10 MiB
-      KEEP: "5"               # agent.log.1 … agent.log.5 → ~60 MiB ceiling
-      INTERVAL: "60"          # seconds between size checks
-    volumes:
-      - ./logs:/var/log/checkly
-      - ./rotate.sh:/usr/local/bin/rotate.sh:ro
-    command: ["sh", "/usr/local/bin/rotate.sh"]
-    logging:
-      driver: json-file
-      options:
-        max-size: "1m"
-        max-file: "2"
-
-# Optional — also put the agent on the demo's own network, so checks can target
-# `http://frontend-proxy:8080` directly instead of hairpinning through the host.
-# The demo must already be up (`cd ../../opentelemetry-demo && make start-checkly`);
-# an external network that does not exist yet fails the `up` outright.
-#
-# networks:
-#   default:
-#     name: checkly-private-location
-#   opentelemetry-demo:
-#     external: true
-#
-# ...and give the agent service:
-#   networks: [default, opentelemetry-demo]
