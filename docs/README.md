@@ -23,18 +23,6 @@ monitor it the way a real customer experiences it: through the Envoy gateway on
 | File | What |
 |---|---|
 | [diagrams/ARCHITECTURE.html](diagrams/ARCHITECTURE.html) | **Complete system** — all 31 services + the browser, every call path, the agent/MCP layer and the whole telemetry stack. Dense: best read at ≥1920px wide, or zoom in the viewer |
-| [diagrams/TELEMETRY.html](diagrams/TELEMETRY.html) | **Telemetry pipeline in detail** — collector receivers vs scrapers, the three databases, Grafana as reader. Read this one first; it is the legible version |
-| [diagrams/MCP-ARCHITECTURE.html](diagrams/MCP-ARCHITECTURE.html) | The agent / MCP / chatbot layer in detail |
-| `diagrams/src/*.archify.json` | Diagram **sources**. Edit these, then re-render — never hand-edit the HTML |
-| `diagrams/visual-check/` | Rendered QA screenshots. Regenerable, git-ignored |
-
-Re-render after editing a source:
-
-```bash
-node .agents/skills/archify/bin/archify.mjs validate architecture docs/diagrams/src/telemetry.archify.json
-node .agents/skills/archify/bin/archify.mjs render  architecture docs/diagrams/src/telemetry.archify.json \
-     docs/diagrams/TELEMETRY.html --quality showcase
-```
 
 ## Scope note
 
