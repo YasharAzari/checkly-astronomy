@@ -1,0 +1,650 @@
+openapi: 3.1.0
+
+info:
+  title: Astronomy Shop — Public BFF API
+  version: "1.0.0-descriptive"
+  summary: The HTTP/JSON surface a customer's browser actually calls.
+  description: |
+    The **public** API of the OpenTelemetry Astronomy Shop demo: the Backend-For-Frontend
+    routes served by the Next.js `frontend` container at `/api/*`, reached through the
+    Envoy gateway.
+
+    ### ⚠️ This specification is descriptive, not authoritative
+
+    The demo does **not** publish an OpenAPI document. This file was reverse-engineered
+    from three sources and is maintained by us, not by the demo authors:
+
+    1. `pb/demo.proto` — the protobuf IDL for the gRPC services behind the BFF
+    2. `src/frontend/pages/api/*.ts` — the BFF handlers that reshape those responses
+    3. Live responses captured from a running stack
+
+    Treat it as an accurate description of observed behaviour, not a contract the
+    upstream project guarantees. Re-verify after a demo upgrade.
+
+    ### Why only this layer has a spec
+
+    The architecture has two hops with two different protocols:
+
+    ```
+    browser ──HTTP/JSON──▶ BFF (/api/*) ──gRPC──▶ product-catalog, cart, checkout, …
+             ^^^^^^^^^^^                 ^^^^^
+             this document               pb/demo.proto
+    ```
+
+    The browser never speaks gRPC. `@grpc/grpc-js` runs only server-side, inside the
+    Next.js API routes. So the gRPC hop already has a formal contract and the public
+    HTTP hop had none — this file fills that gap.
+
+    ### Field naming
+
+    Wire JSON is **camelCase**, not the proto's snake_case — protobuf's canonical JSON
+    mapping. `price_usd` becomes `priceUsd`, `street_address` becomes `streetAddress`.
+
+    ### Money
+
+    Every monetary value is a `Money` object of `units` (whole) + `nanos`
+    (billionths), never a float. `$101.96` is `{units: 101, nanos: 960000000}`.
+    Assert on both fields, or compute `units + nanos / 1e9`.
+
+  contact:
+    name: Upstream demo (not the spec author)
+    url: https://opentelemetry.io/docs/demo/
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local host — browser, curl, or anything on this machine
+  - url: http://frontend-proxy:8080
+    description: >-
+      From INSIDE the demo's Docker network — this is what a Checkly Agent on a
+      Private Location must use. `localhost` is unreachable from a Checkly checker.
+  - url: "{scheme}://{host}:{port}"
+    description: Custom deployment
+    variables:
+      scheme: { default: http, enum: [http, https] }
+      host:   { default: localhost }
+      port:   { default: "8080" }
+
+externalDocs:
+  description: Endpoint catalogue, measured latency baselines and check portfolio
+  url: ../03-public-endpoints.md
+
+# This API requires no authentication — the demo storefront is deliberately open.
+# Declared explicitly so the absence is a documented fact, not an omission.
+security: []
+
+tags:
+  - name: Catalog
+    description: Product browsing. Read-only, fast, no side effects.
+  - name: Cart
+    description: |
+      Cart state, keyed by session.
+
+      **Identity is named inconsistently:** `GET` takes `sessionId` as a *query*
+      parameter; `POST` and `DELETE` take `userId` in the *body*. Same identity,
+      two names. Documented as-is because that is what the service does.
+  - name: Checkout
+    description: Order placement. The widest blast radius in the stack.
+  - name: Ancillary
+    description: Currency, shipping quotes, recommendations and ads.
+
+paths:
+
+  /api/products:
+    get:
+      tags: [Catalog]
+      summary: List all products
+      operationId: listProducts
+      description: |
+        Returns the full catalogue — 10 products, seeded from
+        `src/postgresql/init.sql`, so IDs are stable and safe to assert on.
+
+        Measured ~5 ms. One of the fastest endpoints in the stack.
+      parameters:
+        - $ref: '#/components/parameters/CurrencyCode'
+      responses:
+        '200':
+          description: The product catalogue
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Product' }
+              examples:
+                catalogue:
+                  summary: Two of the ten seeded products
+                  value:
+                    - id: OLJCESPC7Z
+                      name: National Park Foundation Explorascope
+                      description: The National Park Foundation's Explorascope 60AZ is a manual alt-azimuth, refractor telescope.
+                      picture: NationalParkFoundationExplorascope.jpg
+                      priceUsd: { currencyCode: USD, units: 101, nanos: 960000000 }
+                      categories: [telescopes]
+                    - id: HQTGWGPNH4
+                      name: The Comet Book
+                      description: A 16th-century treatise on comets.
+                      picture: TheCometBook.jpg
+                      priceUsd: { currencyCode: USD, units: 0, nanos: 990000000 }
+                      categories: [books]
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+  /api/products/{productId}:
+    get:
+      tags: [Catalog]
+      summary: Get one product
+      operationId: getProduct
+      description: |
+        **Measurably slower than listing everything** — ~683 ms observed, against ~5 ms
+        for the full list. Budget for it separately; a shared timeout will mislead you.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          description: Stable seeded identifier.
+          schema:
+            type: string
+            examples: [OLJCESPC7Z, 66VCHSJNUP, L9ECAV7KIM, HQTGWGPNH4]
+        - $ref: '#/components/parameters/CurrencyCode'
+      responses:
+        '200':
+          description: The product
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+  /api/cart:
+    get:
+      tags: [Cart]
+      summary: Get the cart for a session
+      operationId: getCart
+      description: |
+        Items are **hydrated** — each carries the full `product`, because the handler
+        calls the product catalogue for every line. That is the BFF earning its keep.
+
+        > ⚠️ **The parameter is `sessionId`.** Passing `userId` or `user_id` returns
+        > `200` with `{"userId": "", "items": []}` — an empty cart and **no error**.
+        > A naive assertion passes against nothing. This exact mistake is a live bug in
+        > the demo's own MCP tool.
+      parameters:
+        - name: sessionId
+          in: query
+          required: true
+          description: Session identifier. NOT `userId` — see above.
+          schema: { type: string }
+          example: checkly-probe-001
+        - $ref: '#/components/parameters/CurrencyCode'
+      responses:
+        '200':
+          description: Cart contents, products hydrated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HydratedCart' }
+              examples:
+                populated:
+                  value:
+                    userId: checkly-probe-001
+                    items:
+                      - productId: '66VCHSJNUP'
+                        quantity: 3
+                        product:
+                          id: '66VCHSJNUP'
+                          name: Starsense Explorer Refractor Telescope
+                          description: The first telescope that uses your smartphone to analyze the night sky.
+                          picture: StarsenseExplorer.jpg
+                          priceUsd: { currencyCode: USD, units: 349, nanos: 950000000 }
+                          categories: [telescopes]
+                wrongParamName:
+                  summary: What a wrong parameter name silently returns
+                  value: { userId: "", items: [] }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+    post:
+      tags: [Cart]
+      summary: Add an item to the cart
+      operationId: addCartItem
+      description: |
+        Creates the cart on first call. Note the body uses **`userId`**, while `GET`
+        uses `sessionId` — same identity, different spelling.
+      parameters:
+        - $ref: '#/components/parameters/CurrencyCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddItemRequest' }
+            example:
+              userId: checkly-probe-001
+              item: { productId: OLJCESPC7Z, quantity: 2 }
+      responses:
+        '200':
+          description: The updated cart (un-hydrated — no `product` field)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+              example:
+                userId: checkly-probe-001
+                items: [{ productId: OLJCESPC7Z, quantity: 2 }]
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+    delete:
+      tags: [Cart]
+      summary: Empty the cart
+      operationId: emptyCart
+      description: Use for check teardown so sessions do not accumulate.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: string }
+            example: { userId: checkly-probe-001 }
+      responses:
+        '204': { description: Cart emptied. No body. }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+  /api/checkout:
+    post:
+      tags: [Checkout]
+      summary: Place an order
+      operationId: placeOrder
+      description: |
+        **The highest-value endpoint.** One call transitively exercises seven services:
+        cart, product-catalog, currency, shipping, quote, payment and email — then
+        publishes to Kafka for accounting and fraud-detection.
+
+        Measured ~1.1 s. Allow 15 s.
+
+        **Requires a non-empty cart** — `POST /api/cart` first with the same identity.
+        The cart is emptied on success, so a check that adds then checks out is
+        naturally idempotent.
+
+        ### `422` is a correct response, not an outage
+
+        The demo injects payment declines via the `paymentFailure` feature flag. The
+        handler distinguishes a decline (`422`, `code: PAYMENT_FAILED`) from an
+        internal error (`500`). A check treating every non-2xx as failure will alarm
+        on a deliberately simulated decline. Decide which you want — and be able to
+        explain why.
+      parameters:
+        - $ref: '#/components/parameters/CurrencyCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlaceOrderRequest' }
+            example:
+              userId: checkly-probe-001
+              userCurrency: USD
+              email: check@example.com
+              address:
+                streetAddress: 1600 Amphitheatre Parkway
+                city: Mountain View
+                state: CA
+                country: USA
+                zipCode: '94043'
+              creditCard:
+                creditCardNumber: 4432-8015-6152-0454
+                creditCardCvv: 672
+                creditCardExpirationYear: 2030
+                creditCardExpirationMonth: 1
+      responses:
+        '200':
+          description: Order placed. Cart is now empty.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderResult' }
+              example:
+                orderId: ce9279bb-ae8f-11f1-ad86-661a3d578bed
+                shippingTrackingId: 9164282a-57a1-4bd8-95df-b8f1d74ad269
+                shippingCost: { currencyCode: USD, units: 8, nanos: 990000000 }
+                shippingAddress:
+                  streetAddress: 1600 Amphitheatre Parkway
+                  city: Mountain View
+                  state: CA
+                  country: USA
+                  zipCode: '94043'
+                items:
+                  - cost: { currencyCode: USD, units: 101, nanos: 959999999 }
+                    item: { productId: OLJCESPC7Z, quantity: 1 }
+        '422':
+          description: |
+            **Payment declined** — a business outcome, not a fault. Produced on purpose
+            by the `paymentFailure` flag.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentError' }
+              example:
+                error: Your payment could not be processed. Please check your card details and try again.
+                code: PAYMENT_FAILED
+        '500':
+          description: |
+            Order could not be placed. Genuine failure — an empty cart, a downstream
+            service being unreachable, or a malformed body (for example sending
+            `user_id` instead of `userId`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Failed to place order. }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+  /api/currency:
+    get:
+      tags: [Ancillary]
+      summary: List supported currency codes
+      operationId: listCurrencies
+      description: |
+        33 ISO-4217 codes, from ECB data.
+
+        **The best liveness probe in the stack** — ~4 ms and no downstream
+        dependencies, so if this is slow the problem is Envoy or the frontend itself,
+        never a backend. Use it as the canary.
+      responses:
+        '200':
+          description: Supported currency codes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string, pattern: '^[A-Z]{3}$' }
+              example: [USD, EUR, GBP, JPY, CAD, CHF, SEK, NOK, CNY]
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+  /api/recommendations:
+    get:
+      tags: [Ancillary]
+      summary: Get recommended products
+      operationId: getRecommendations
+      description: |
+        **The least stable endpoint.** It calls back into `product-catalog` to hydrate
+        every result, so it inherits that service's latency *and* its instability.
+
+        Observed between **0.35 s and 3.1 s**, and once a **504 after 15 s** while
+        `product-catalog` was restarting — against 4–5 ms for currency and products.
+
+        Allow ~20 s and alert on *consecutive* failures; a single failure here is
+        genuinely inconclusive.
+      parameters:
+        - name: productIds
+          in: query
+          description: Seed products for the recommendation.
+          schema:
+            type: array
+            items: { type: string }
+          example: [OLJCESPC7Z]
+        - name: sessionId
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/CurrencyCode'
+      responses:
+        '200':
+          description: Recommended products (typically 4)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Product' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '504':
+          description: Upstream timeout. Observed in practice — see description.
+          content:
+            text/plain:
+              schema: { type: string }
+              example: upstream request timeout
+
+  /api/shipping:
+    get:
+      tags: [Ancillary]
+      summary: Get a shipping quote
+      operationId: getShippingQuote
+      description: |
+        Two hops — `shipping` (Rust, HTTP) calls `quote` (PHP, HTTP).
+
+        > **`itemList` and `address` are JSON documents encoded inside query
+        > parameters**, not repeated params or a body. URL-encode them. This is the
+        > most common source of malformed requests against this endpoint.
+      parameters:
+        - name: itemList
+          in: query
+          required: true
+          description: JSON-encoded array of `{productId, quantity}`.
+          schema: { type: string, format: json }
+          example: '[{"productId":"OLJCESPC7Z","quantity":2}]'
+        - name: address
+          in: query
+          required: true
+          description: JSON-encoded `Address`.
+          schema: { type: string, format: json }
+          example: '{"streetAddress":"1600 Amphitheatre Parkway","city":"Mountain View","state":"CA","country":"USA","zipCode":"94043"}'
+        - name: currencyCode
+          in: query
+          schema: { type: string, default: USD }
+      responses:
+        '200':
+          description: Shipping cost
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Money' }
+              example: { currencyCode: USD, units: 17, nanos: 980000000 }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+  /api/data:
+    get:
+      tags: [Ancillary]
+      summary: Get contextual ads
+      operationId: getAds
+      description: |
+        Named `/api/data`, not `/api/ads`. Served by the Java `ad` service — the one
+        component whose metrics the collector **scrapes** (`ad:9465`) rather than
+        receives over OTLP.
+      parameters:
+        - name: contextKeys
+          in: query
+          description: Context keywords describing the current page.
+          schema:
+            type: array
+            items: { type: string }
+          example: [telescopes]
+      responses:
+        '200':
+          description: Advertisements
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Ad' }
+              example:
+                - redirectUrl: /product/2ZYFJ3GM2N
+                  text: Roof Binoculars for sale. 20% off.
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+components:
+
+  parameters:
+    CurrencyCode:
+      name: currencyCode
+      in: query
+      required: false
+      description: ISO-4217 code. Omit or use `USD` to skip conversion entirely.
+      schema: { type: string, pattern: '^[A-Z]{3}$', default: USD }
+      example: USD
+
+  responses:
+    MethodNotAllowed:
+      description: Method not supported on this route. Empty body.
+
+  schemas:
+
+    Money:
+      type: object
+      title: Money
+      description: |
+        Fixed-point amount. **Never a float.** `units` is the whole part, `nanos` the
+        fractional part in billionths, so `$101.96` is
+        `{units: 101, nanos: 960000000}`.
+
+        Beware rounding: a real captured order line read `nanos: 959999999`. Assert
+        with tolerance, or on `units` alone.
+      required: [currencyCode, units, nanos]
+      properties:
+        currencyCode: { type: string, pattern: '^[A-Z]{3}$', example: USD }
+        units:        { type: integer, format: int64, example: 101 }
+        nanos:        { type: integer, format: int32, minimum: -999999999, maximum: 999999999, example: 960000000 }
+
+    Product:
+      type: object
+      title: Product
+      required: [id, name, description, picture, priceUsd, categories]
+      properties:
+        id:          { type: string, description: Stable seeded ID, example: OLJCESPC7Z }
+        name:        { type: string, example: National Park Foundation Explorascope }
+        description: { type: string }
+        picture:
+          type: string
+          description: Filename only. Full URL is `/images/products/{picture}` via Envoy.
+          example: NationalParkFoundationExplorascope.jpg
+        priceUsd:    { $ref: '#/components/schemas/Money' }
+        categories:
+          type: array
+          items: { type: string }
+          example: [telescopes]
+
+    CartItem:
+      type: object
+      title: CartItem
+      required: [productId, quantity]
+      properties:
+        productId: { type: string, example: OLJCESPC7Z }
+        quantity:  { type: integer, format: int32, minimum: 1, example: 2 }
+
+    HydratedCartItem:
+      title: HydratedCartItem
+      description: A cart line with its product joined in by the BFF.
+      allOf:
+        - $ref: '#/components/schemas/CartItem'
+        - type: object
+          properties:
+            product: { $ref: '#/components/schemas/Product' }
+
+    Cart:
+      type: object
+      title: Cart
+      description: Un-hydrated cart, as returned by `POST /api/cart`.
+      required: [userId, items]
+      properties:
+        userId: { type: string }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CartItem' }
+
+    HydratedCart:
+      type: object
+      title: HydratedCart
+      description: |
+        Cart as returned by `GET /api/cart`, with each line's product joined in.
+        An empty `userId` with an empty `items` array usually means the `sessionId`
+        parameter was wrong, not that the cart is genuinely empty.
+      required: [userId, items]
+      properties:
+        userId: { type: string }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/HydratedCartItem' }
+
+    AddItemRequest:
+      type: object
+      title: AddItemRequest
+      required: [userId, item]
+      properties:
+        userId: { type: string, description: 'Identity. Called `sessionId` on GET.' }
+        item:   { $ref: '#/components/schemas/CartItem' }
+
+    Address:
+      type: object
+      title: Address
+      required: [streetAddress, city, state, country, zipCode]
+      properties:
+        streetAddress: { type: string, example: 1600 Amphitheatre Parkway }
+        city:          { type: string, example: Mountain View }
+        state:         { type: string, example: CA }
+        country:       { type: string, example: USA }
+        zipCode:
+          type: string
+          description: A string, not an integer — leading zeros are significant.
+          example: '94043'
+
+    CreditCardInfo:
+      type: object
+      title: CreditCardInfo
+      description: Mock payment details. The `payment` service never contacts a real processor.
+      required: [creditCardNumber, creditCardCvv, creditCardExpirationYear, creditCardExpirationMonth]
+      properties:
+        creditCardNumber:          { type: string, example: 4432-8015-6152-0454 }
+        creditCardCvv:             { type: integer, format: int32, example: 672 }
+        creditCardExpirationYear:  { type: integer, format: int32, example: 2030 }
+        creditCardExpirationMonth: { type: integer, format: int32, minimum: 1, maximum: 12, example: 1 }
+
+    PlaceOrderRequest:
+      type: object
+      title: PlaceOrderRequest
+      description: |
+        > ⚠️ The field is **`userId`**, camelCase. The demo's own MCP tool documents it
+        > as `user_id`, which returns `500` — and the error message then misleadingly
+        > blames an empty cart.
+      required: [userId, userCurrency, email, address, creditCard]
+      properties:
+        userId:       { type: string }
+        userCurrency: { type: string, pattern: '^[A-Z]{3}$', example: USD }
+        email:        { type: string, format: email }
+        address:      { $ref: '#/components/schemas/Address' }
+        creditCard:   { $ref: '#/components/schemas/CreditCardInfo' }
+
+    OrderItem:
+      type: object
+      title: OrderItem
+      required: [cost, item]
+      properties:
+        cost: { $ref: '#/components/schemas/Money' }
+        item: { $ref: '#/components/schemas/HydratedCartItem' }
+
+    OrderResult:
+      type: object
+      title: OrderResult
+      required: [orderId, shippingTrackingId, shippingCost, shippingAddress, items]
+      properties:
+        orderId:            { type: string, format: uuid }
+        shippingTrackingId: { type: string, format: uuid }
+        shippingCost:       { $ref: '#/components/schemas/Money' }
+        shippingAddress:    { $ref: '#/components/schemas/Address' }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/OrderItem' }
+
+    Ad:
+      type: object
+      title: Ad
+      required: [redirectUrl, text]
+      properties:
+        redirectUrl: { type: string, example: /product/2ZYFJ3GM2N }
+        text:        { type: string, example: Roof Binoculars for sale. 20% off. }
+
+    Error:
+      type: object
+      title: Error
+      required: [error]
+      properties:
+        error: { type: string }
+
+    PaymentError:
+      type: object
+      title: PaymentError
+      required: [error, code]
+      properties:
+        error: { type: string }
+        code:  { type: string, const: PAYMENT_FAILED }

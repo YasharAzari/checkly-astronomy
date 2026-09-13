@@ -1,0 +1,16 @@
+# Lint configuration for astronomy-shop-bff.yaml
+#
+# Starts from Redocly's `recommended` ruleset, with two rules turned off because
+# they encode assumptions that are false for this API — not because the spec is wrong.
+extends:
+  - recommended
+
+rules:
+  # The demo runs locally and is reached at localhost:8080 (or frontend-proxy:8080
+  # from inside the Docker network). Those ARE the real servers; substituting a
+  # fake public hostname to satisfy a lint rule would make the document wrong.
+  no-server-example.com: off
+
+  # Operation-level security is unnecessary: `security: []` is declared at the root
+  # because the storefront requires no authentication at all.
+  security-defined: off

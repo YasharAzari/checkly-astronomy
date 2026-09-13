@@ -16,6 +16,7 @@ monitor it the way a real customer experiences it: through the Envoy gateway on
 | [02-telemetry-pipeline.md](02-telemetry-pipeline.md) | Collector receivers/exporters, Jaeger, Prometheus, OpenSearch, Grafana | You are interpreting a check failure, or asking "is it the app or the monitoring?" |
 | [03-public-endpoints.md](03-public-endpoints.md) | **The synthetic-test surface.** Every URL a customer can reach, with contracts and measured baselines | You are writing a check |
 | [04-agent-mcp-chatbot.md](04-agent-mcp-chatbot.md) | The agent / MCP / chatbot layer, and whether it needs a real LLM | You are deciding whether the chatbot is in scope |
+| [openapi/](openapi/) | **OpenAPI 3.1 spec** for the public BFF API, plus a browsable offline reference | You want machine-readable contracts, or to scaffold checks from a spec |
 
 ## Diagrams
 

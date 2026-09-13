@@ -31,3 +31,7 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# Checkly agent logs — bind-mounted out of the container, regenerated at runtime
+private-location/logs/*
+!private-location/logs/.gitkeep
