@@ -1,8 +1,10 @@
 # Checkly Astronomy
 
 Monitoring project for the [OpenTelemetry Astronomy Shop](https://opentelemetry.io/docs/demo/)
-demo, running locally under Docker. Covers the public APIs, and UI layer for full synthetic coverage
-and fast issue detection and revenue assurance using Checkly, complementing the already well oiled Observability stack
+demo, running locally under Docker. Covers the public APIs, and UI layer for full synthetic coverage, 
+fast issue detection and revenue assurance using Checkly, complementing the already well oiled Observability stack
+
+![Checkly dashboard showing the five business groups with live check results](assets/checkly-astronomy-live-overview.png)
 
 ## Quick Start
 
