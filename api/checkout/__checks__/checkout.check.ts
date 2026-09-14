@@ -1,4 +1,4 @@
-import { ApiCheck, AssertionBuilder, QueryParam } from 'checkly/constructs'
+import { ApiCheck, Frequency, AssertionBuilder, QueryParam } from 'checkly/constructs'
 import {
   ADDRESS,
   CHECKOUT_SESSION_ID,
@@ -56,7 +56,7 @@ const seedDeclineCart = {
 new ApiCheck('checkout-place-order', {
   name: 'POST /api/checkout — place order',
   description: "Place an order, exercising seven services end to end",
-  tags: ['api', 'checkout'],
+  tags: ['api', 'checkout', 'critical'],
   setupScript: {
     entrypoint: './seed-checkout-cart.setup.ts',
   },
@@ -84,6 +84,7 @@ new ApiCheck('checkout-empty-cart', {
   name: 'POST /api/checkout — 500 on empty cart',
   description: "Placing an order against a session with no cart fails",
   tags: ['api', 'checkout', 'negative'],
+  frequency: Frequency.EVERY_10M,
   shouldFail: true,
   degradedResponseTime: 5000,
   maxResponseTime: 15000,
@@ -106,6 +107,7 @@ new ApiCheck('checkout-wrong-identity-key', {
   name: 'POST /api/checkout — 500 on user_id instead of userId',
   description: "The snake_case identity key is not read and the order fails",
   tags: ['api', 'checkout', 'negative'],
+  frequency: Frequency.EVERY_10M,
   shouldFail: true,
   degradedResponseTime: 5000,
   maxResponseTime: 15000,
@@ -128,6 +130,7 @@ new ApiCheck('checkout-card-declined', {
   name: 'POST /api/checkout — 422 on an invalid card number',
   description: "A card failing the Luhn check is declined as a business outcome",
   tags: ['api', 'checkout', 'negative'],
+  frequency: Frequency.EVERY_10M,
   shouldFail: true,
   setupScript: seedDeclineCart,
   degradedResponseTime: 5000,
@@ -151,6 +154,7 @@ new ApiCheck('checkout-card-expired', {
   name: 'POST /api/checkout — 422 on an expired card',
   description: "An expired expiry year is declined as a business outcome",
   tags: ['api', 'checkout', 'negative'],
+  frequency: Frequency.EVERY_10M,
   shouldFail: true,
   setupScript: seedDeclineCart,
   degradedResponseTime: 5000,
@@ -174,6 +178,7 @@ new ApiCheck('checkout-method-not-allowed', {
   name: 'GET /api/checkout — 405 method not allowed',
   description: "Reject an unsupported method on the checkout route",
   tags: ['api', 'checkout', 'negative'],
+  frequency: Frequency.EVERY_10M,
   shouldFail: true,
   degradedResponseTime: 1000,
   maxResponseTime: 2000,

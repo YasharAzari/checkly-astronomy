@@ -4,7 +4,7 @@ import { DEFAULT_CURRENCY, jsonHeader } from '../../../checkly.fixtures'
 new ApiCheck('currency-list', {
   name: 'GET /api/currency - supported currencies',
   description: "List the supported ISO-4217 currency codes",
-  tags: ['api', 'addons'],
+  tags: ['api', 'addons', 'critical'],
   degradedResponseTime: 1000,
   maxResponseTime: 2000,
   request: {

@@ -35,3 +35,7 @@ Thumbs.db
 # Checkly agent logs — bind-mounted out of the container, regenerated at runtime
 private-location/logs/*
 !private-location/logs/.gitkeep
+
+# Playwright local run artifacts
+test-results/
+playwright-report/

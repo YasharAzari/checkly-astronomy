@@ -8,7 +8,7 @@ const ITEM_LIST = [
 new ApiCheck('shipping-quote', {
   name: 'GET /api/shipping - shipping quote',
   description: "Quote shipping for an item list and address",
-  tags: ['api', 'addons'],
+  tags: ['api', 'addons', 'critical'],
   degradedResponseTime: 2500,
   maxResponseTime: 5000,
   request: {

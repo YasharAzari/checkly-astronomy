@@ -1,4 +1,4 @@
-import { ApiCheck, AssertionBuilder, QueryParam } from 'checkly/constructs'
+import { ApiCheck, Frequency, AssertionBuilder, QueryParam } from 'checkly/constructs'
 import { jsonHeader } from '../../../checkly.fixtures'
 
 const CONTEXT_KEYS = ['telescopes']
@@ -29,6 +29,7 @@ new ApiCheck('ads-method-not-allowed', {
   name: 'POST /api/data - 405 method not allowed',
   description: "Reject an unsupported method on the ads route",
   tags: ['api', 'addons', 'negative'],
+  frequency: Frequency.EVERY_10M,
   shouldFail: true,
   degradedResponseTime: 1000,
   maxResponseTime: 2000,

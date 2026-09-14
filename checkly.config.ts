@@ -8,6 +8,7 @@ const config = defineConfig({
   projectName: 'checkly-astronomy',
   logicalId: 'checkly-astronomy',
   checks: {
+    activated: process.env.CHECKS_ACTIVE !== 'false',
     frequency: Frequency.EVERY_5M,
     environmentVariables: [
       // Note: this url and global config was set up for a local dev environment
