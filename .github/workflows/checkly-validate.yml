@@ -1,0 +1,44 @@
+name: checkly-validate
+
+on:
+  workflow_call:
+    secrets:
+      CHECKLY_API_KEY:
+        required: true
+      CHECKLY_ACCOUNT_ID:
+        required: true
+
+jobs:
+  validate:
+    name: Typecheck and validate
+    runs-on: ubuntu-latest
+    env:
+      CHECKLY_API_KEY: ${{ secrets.CHECKLY_API_KEY }}
+      CHECKLY_ACCOUNT_ID: ${{ secrets.CHECKLY_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck constructs and specs
+        run: npx tsc --noEmit
+
+      - name: Validate Checkly project
+        run: npx checkly validate
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Checkly validate"
+            echo ""
+            echo "| Step | Result |"
+            echo "|---|---|"
+            echo "| Typecheck (\`tsc --noEmit\`) | ${{ job.status == 'success' && 'passed' || 'see log' }} |"
+            echo "| Project validation | ${{ job.status == 'success' && 'passed' || 'see log' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

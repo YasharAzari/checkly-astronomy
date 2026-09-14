@@ -1,0 +1,51 @@
+name: checkly-test
+
+on:
+  workflow_call:
+    inputs:
+      grep:
+        description: Only run checks whose name matches this regex
+        type: string
+        required: false
+        default: ''
+      record:
+        description: Record a test session in Checkly with logs and traces
+        type: boolean
+        required: false
+        default: true
+    secrets:
+      CHECKLY_API_KEY:
+        required: true
+      CHECKLY_ACCOUNT_ID:
+        required: true
+
+jobs:
+  test:
+    name: One-off check run
+    runs-on: ubuntu-latest
+    env:
+      CHECKLY_API_KEY: ${{ secrets.CHECKLY_API_KEY }}
+      CHECKLY_ACCOUNT_ID: ${{ secrets.CHECKLY_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run checks on the private location
+        env:
+          GREP: ${{ inputs.grep }}
+          RECORD: ${{ inputs.record }}
+        run: |
+          # the github reporter writes its markdown wherever this points
+          export CHECKLY_REPORTER_GITHUB_OUTPUT="$GITHUB_STEP_SUMMARY"
+
+          args=(test --reporter=github --verbose)
+          [ "$RECORD" = "true" ] || args+=(--no-record)
+          [ -n "$GREP" ] && args+=(--grep "$GREP")
+
+          npx checkly "${args[@]}"

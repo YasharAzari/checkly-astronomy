@@ -1,0 +1,51 @@
+name: CI gate — validate and test
+
+# Manual gate: prove the project is sound, then actually run every check
+# against the private location before anyone deploys.
+on:
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: 'Only run checks matching this regex (blank = all)'
+        type: string
+        required: false
+        default: ''
+      record:
+        description: 'Record a Checkly test session (logs, traces, videos)'
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  validate:
+    uses: ./.github/workflows/checkly-validate.yml
+    secrets: inherit
+
+  test:
+    needs: validate
+    uses: ./.github/workflows/checkly-test.yml
+    with:
+      grep: ${{ inputs.grep }}
+      record: ${{ inputs.record }}
+    secrets: inherit
+
+  gate:
+    name: Gate result
+    needs: [validate, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report
+        run: |
+          {
+            echo "## CI gate"
+            echo ""
+            echo "| Stage | Result |"
+            echo "|---|---|"
+            echo "| Validate | ${{ needs.validate.result }} |"
+            echo "| Test | ${{ needs.test.result }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if any stage failed
+        if: needs.validate.result != 'success' || needs.test.result != 'success'
+        run: exit 1

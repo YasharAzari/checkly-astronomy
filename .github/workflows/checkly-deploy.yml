@@ -1,0 +1,50 @@
+name: checkly-deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub environment to deploy through
+        type: string
+        required: false
+        default: ''
+    secrets:
+      CHECKLY_API_KEY:
+        required: true
+      CHECKLY_ACCOUNT_ID:
+        required: true
+
+jobs:
+  deploy:
+    name: Deploy checks to Checkly
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      CHECKLY_API_KEY: ${{ secrets.CHECKLY_API_KEY }}
+      CHECKLY_ACCOUNT_ID: ${{ secrets.CHECKLY_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Preview what will change
+        run: npx checkly deploy --preview
+
+      - name: Deploy
+        run: npx checkly deploy --force
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Checkly deploy"
+            echo ""
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Triggered by: @${{ github.actor }}"
+            echo "- Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"

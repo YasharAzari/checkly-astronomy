@@ -1,0 +1,24 @@
+name: Release — validate and deploy
+
+# Manual release: validate first, then push the checks to Checkly.
+# Deploy only runs if validation passed.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'GitHub environment to deploy through (blank = none)'
+        type: string
+        required: false
+        default: ''
+
+jobs:
+  validate:
+    uses: ./.github/workflows/checkly-validate.yml
+    secrets: inherit
+
+  deploy:
+    needs: validate
+    uses: ./.github/workflows/checkly-deploy.yml
+    with:
+      environment: ${{ inputs.environment }}
+    secrets: inherit

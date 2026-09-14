@@ -53,7 +53,7 @@ npx checkly deploy           # deploy to Checkly
 | Checkout rejects bad methods | API | Yes | 10m | `GET` rejected with 405 |
 | Purchase flow | MultiStep | — | 5m | browse → add to cart → purchase → cart emptied |
 
-### Ancillary
+### Supporting services
 
 | Check | Type | Negative | Frequency | What it validates |
 |-------|------|----------|-----------|-------------------|
@@ -95,8 +95,11 @@ Don't hesitate to change it if the demo stack is running publicly in production 
 
 ```
 ├── checkly.config.ts                 # project config (runtime 2026.04, private location)
-├── checkly.fixtures.ts               # all test data and shared to the checks when needed
-├── tsconfig.json
+├── checkly.fixtures.ts               # all test data, shared by checks, specs and setup scripts
+├── checkly.groups.ts                 # the five business check groups
+├── playwright.config.ts              
+├── tsconfig.json                     
+├── .nvmrc                            
 ├── api/                              # the api checks, public endpoints surface
 │   ├── catalog/__checks__/
 │   ├── cart/__checks__/              
@@ -104,7 +107,9 @@ Don't hesitate to change it if the demo stack is running publicly in production 
 │   └── addons/__checks__/
 ├── e2e-journeys/                     # synthetic real user journeys on the store UI
 │   └── catalog/__checks__/
+├── .github/workflows/                # manual github actions: validate, test and deploy monitors
 ├── private-location/                 # Checkly Agent container
+├── assets/                           
 └── docs/                             # Generated documentation + OpenAPI spec from the otel demo project
 ```
 
