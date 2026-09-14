@@ -1,8 +1,8 @@
 import { ApiCheck, AssertionBuilder } from 'checkly/constructs'
-import { CART_WRITE_SESSION_ID, jsonHeader } from '../../../checkly.fixtures'
+import { jsonHeader } from '../../../checkly.fixtures'
 
 const EMPTY_CART_BODY = {
-  userId: CART_WRITE_SESSION_ID,
+  userId: '{{CHECK_RUN_ID}}',
 }
 
 new ApiCheck('cart-empty', {

@@ -1,16 +1,18 @@
 import { test, expect, APIRequestContext } from '@playwright/test'
 import {
   BASE_URL_DEV,
-  CART_LIFECYCLE_SESSION_ID,
+  sessionId,
   DEFAULT_CURRENCY,
   PRODUCT_ID,
   PRODUCT_NAME,
   QUANTITY,
 } from '../../../checkly.fixtures'
 
+const SESSION_ID = sessionId()
+
 const readCart = (request: APIRequestContext) =>
   request.get(`${BASE_URL_DEV}/api/cart`, {
-    params: { sessionId: CART_LIFECYCLE_SESSION_ID, currencyCode: DEFAULT_CURRENCY },
+    params: { sessionId: SESSION_ID, currencyCode: DEFAULT_CURRENCY },
   })
 
 test('cart lifecycle', async ({ request }) => {
@@ -26,7 +28,7 @@ test('cart lifecycle', async ({ request }) => {
     const response = await request.post(`${BASE_URL_DEV}/api/cart`, {
       params: { currencyCode: DEFAULT_CURRENCY },
       data: {
-        userId: CART_LIFECYCLE_SESSION_ID,
+        userId: SESSION_ID,
         item: { productId: PRODUCT_ID, quantity: QUANTITY },
       },
     })
@@ -46,7 +48,7 @@ test('cart lifecycle', async ({ request }) => {
 
   await test.step('empty the cart', async () => {
     const response = await request.delete(`${BASE_URL_DEV}/api/cart`, {
-      data: { userId: CART_LIFECYCLE_SESSION_ID },
+      data: { userId: SESSION_ID },
     })
     expect(response.status()).toBe(204)
   })

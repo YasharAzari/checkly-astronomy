@@ -1,5 +1,5 @@
 import { ApiCheck, Frequency, AssertionBuilder, QueryParam } from 'checkly/constructs'
-import { DEFAULT_CURRENCY, PRODUCT_ID, SEEDED_SESSION_ID, jsonHeader } from '../../../checkly.fixtures'
+import { DEFAULT_CURRENCY, PRODUCT_ID, jsonHeader } from '../../../checkly.fixtures'
 
 const SEED_PRODUCT_IDS = [PRODUCT_ID]
 
@@ -15,7 +15,7 @@ new ApiCheck('recommendations-list', {
     headers: [jsonHeader],
     queryParameters: [
       ...SEED_PRODUCT_IDS.map(id => <QueryParam>{key: "productIds", value: id}),
-      <QueryParam>{key: "sessionId", value: SEEDED_SESSION_ID},
+      <QueryParam>{key: "sessionId", value: '{{CHECK_RUN_ID}}'},
       <QueryParam>{key: "currencyCode", value: DEFAULT_CURRENCY},
     ],
     followRedirects: true,

@@ -1,8 +1,8 @@
 import { ApiCheck, Frequency, AssertionBuilder, QueryParam } from 'checkly/constructs'
-import { CART_WRITE_SESSION_ID, DEFAULT_CURRENCY, PRODUCT_ID, QUANTITY, jsonHeader } from '../../../checkly.fixtures'
+import { DEFAULT_CURRENCY, PRODUCT_ID, QUANTITY, jsonHeader } from '../../../checkly.fixtures'
 
 const ADD_ITEM_BODY = {
-  userId: CART_WRITE_SESSION_ID,
+  userId: '{{CHECK_RUN_ID}}',
   item: {
     productId: PRODUCT_ID,
     quantity: QUANTITY,

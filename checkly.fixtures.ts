@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 export const BASE_URL_DEV = process.env.BASE_URL_DEV ?? 'http://frontend-proxy:8080'
 export const DEFAULT_CURRENCY = 'EUR'
 
@@ -11,13 +13,8 @@ export const PRODUCT_NAME = 'National Park Foundation Explorascope'
 export const UNKNOWN_PRODUCT_ID = 'NO-SUCH-PRODUCT'
 export const QUANTITY = 2
 
-export const SEEDED_SESSION_ID = 'checkly-probe-001'
-export const CART_WRITE_SESSION_ID = 'checkly-probe-002'
-export const CHECKOUT_SESSION_ID = 'checkly-probe-checkout'
-export const DECLINE_SESSION_ID = 'checkly-probe-decline'
-export const UNSEEDED_SESSION_ID = 'checkly-probe-empty'
-export const CART_LIFECYCLE_SESSION_ID = 'checkly-probe-lifecycle'
-export const PURCHASE_LIFECYCLE_SESSION_ID = 'checkly-probe-purchase'
+
+export const sessionId = () => randomUUID()
 
 export const EMAIL = 'check@example.com'
 

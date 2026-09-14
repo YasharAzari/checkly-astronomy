@@ -1,5 +1,5 @@
 import { ApiCheck, Frequency, AssertionBuilder, QueryParam } from 'checkly/constructs'
-import { DEFAULT_CURRENCY, SEEDED_SESSION_ID, jsonHeader } from '../../../checkly.fixtures'
+import { DEFAULT_CURRENCY, jsonHeader } from '../../../checkly.fixtures'
 
 const WRONG_IDENTITY_KEY = 'userId'
 
@@ -17,7 +17,7 @@ new ApiCheck('cart-get', {
     url: '{{{BASE_URL_DEV}}}/api/cart',
     headers: [jsonHeader],
     queryParameters: [
-      <QueryParam>{key: "sessionId", value: SEEDED_SESSION_ID},
+      <QueryParam>{key: "sessionId", value: '{{CHECK_RUN_ID}}'},
       <QueryParam>{key: "currencyCode", value: DEFAULT_CURRENCY},
     ],
     followRedirects: true,
@@ -42,7 +42,7 @@ new ApiCheck('cart-get-wrong-param', {
     url: '{{{BASE_URL_DEV}}}/api/cart',
     headers: [jsonHeader],
     queryParameters: [
-      <QueryParam>{key: WRONG_IDENTITY_KEY, value: SEEDED_SESSION_ID},
+      <QueryParam>{key: WRONG_IDENTITY_KEY, value: '{{CHECK_RUN_ID}}'},
       <QueryParam>{key: "currencyCode", value: DEFAULT_CURRENCY},
     ],
     followRedirects: true,

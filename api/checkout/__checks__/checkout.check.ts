@@ -1,65 +1,47 @@
 import { ApiCheck, Frequency, AssertionBuilder, QueryParam } from 'checkly/constructs'
 import {
   ADDRESS,
-  CHECKOUT_SESSION_ID,
   CREDIT_CARD,
-  DECLINE_SESSION_ID,
   DECLINED_CREDIT_CARD,
   DEFAULT_CURRENCY,
   EMAIL,
   EXPIRED_CREDIT_CARD,
-  SEEDED_SESSION_ID,
-  UNSEEDED_SESSION_ID,
   jsonHeader,
 } from '../../../checkly.fixtures'
 
 const PLACE_ORDER_BODY = {
-  userId: SEEDED_SESSION_ID,
+  userId: '{{CHECK_RUN_ID}}',
   userCurrency: DEFAULT_CURRENCY,
   email: EMAIL,
   address: ADDRESS,
   creditCard: CREDIT_CARD,
 }
 
-const SUCCESSFUL_ORDER_BODY = {
-  ...PLACE_ORDER_BODY,
-  userId: CHECKOUT_SESSION_ID,
-}
-
-const EMPTY_CART_ORDER_BODY = {
-  ...PLACE_ORDER_BODY,
-  userId: UNSEEDED_SESSION_ID,
-}
-
 const WRONG_IDENTITY_KEY_ORDER_BODY = {
   ...PLACE_ORDER_BODY,
   userId: undefined,
-  user_id: SEEDED_SESSION_ID,
+  user_id: '{{CHECK_RUN_ID}}',
 }
 
 const DECLINED_ORDER_BODY = {
   ...PLACE_ORDER_BODY,
-  userId: DECLINE_SESSION_ID,
   creditCard: DECLINED_CREDIT_CARD,
 }
 
 const EXPIRED_ORDER_BODY = {
   ...PLACE_ORDER_BODY,
-  userId: DECLINE_SESSION_ID,
   creditCard: EXPIRED_CREDIT_CARD,
 }
 
-const seedDeclineCart = {
-  entrypoint: './seed-decline-cart.setup.ts',
+const seedCart = {
+  entrypoint: './seed-checkout-cart.setup.ts',
 }
 
 new ApiCheck('checkout-place-order', {
   name: 'POST /api/checkout — place order',
   description: "Place an order, exercising seven services end to end",
   tags: ['api', 'checkout', 'critical'],
-  setupScript: {
-    entrypoint: './seed-checkout-cart.setup.ts',
-  },
+  setupScript: seedCart,
   degradedResponseTime: 5000,
   maxResponseTime: 15000,
   request: {
@@ -68,7 +50,7 @@ new ApiCheck('checkout-place-order', {
     headers: [jsonHeader],
     queryParameters: [<QueryParam>{key: "currencyCode", value: DEFAULT_CURRENCY}],
     bodyType: 'JSON',
-    body: JSON.stringify(SUCCESSFUL_ORDER_BODY),
+    body: JSON.stringify(PLACE_ORDER_BODY),
     followRedirects: true,
     assertions: [
       AssertionBuilder.statusCode().equals(200),
@@ -94,7 +76,7 @@ new ApiCheck('checkout-empty-cart', {
     headers: [jsonHeader],
     queryParameters: [<QueryParam>{key: "currencyCode", value: DEFAULT_CURRENCY}],
     bodyType: 'JSON',
-    body: JSON.stringify(EMPTY_CART_ORDER_BODY),
+    body: JSON.stringify(PLACE_ORDER_BODY),
     followRedirects: true,
     assertions: [
       AssertionBuilder.statusCode().equals(500),
@@ -132,7 +114,7 @@ new ApiCheck('checkout-card-declined', {
   tags: ['api', 'checkout', 'negative'],
   frequency: Frequency.EVERY_10M,
   shouldFail: true,
-  setupScript: seedDeclineCart,
+  setupScript: seedCart,
   degradedResponseTime: 5000,
   maxResponseTime: 15000,
   request: {
@@ -156,7 +138,7 @@ new ApiCheck('checkout-card-expired', {
   tags: ['api', 'checkout', 'negative'],
   frequency: Frequency.EVERY_10M,
   shouldFail: true,
-  setupScript: seedDeclineCart,
+  setupScript: seedCart,
   degradedResponseTime: 5000,
   maxResponseTime: 15000,
   request: {

@@ -7,13 +7,15 @@ import {
   EMAIL,
   PRODUCT_ID,
   PRODUCT_NAME,
-  PURCHASE_LIFECYCLE_SESSION_ID,
+  sessionId,
   QUANTITY,
 } from '../../../checkly.fixtures'
 
+const SESSION_ID = sessionId()
+
 const readCart = (request: APIRequestContext) =>
   request.get(`${BASE_URL_DEV}/api/cart`, {
-    params: { sessionId: PURCHASE_LIFECYCLE_SESSION_ID, currencyCode: DEFAULT_CURRENCY },
+    params: { sessionId: SESSION_ID, currencyCode: DEFAULT_CURRENCY },
   })
 
 test('checkout lifecycle', async ({ request }) => {
@@ -21,7 +23,7 @@ test('checkout lifecycle', async ({ request }) => {
 
   await test.step('start from an empty cart', async () => {
     const response = await request.delete(`${BASE_URL_DEV}/api/cart`, {
-      data: { userId: PURCHASE_LIFECYCLE_SESSION_ID },
+      data: { userId: SESSION_ID },
     })
     expect(response.status()).toBe(204)
   })
@@ -44,7 +46,7 @@ test('checkout lifecycle', async ({ request }) => {
     const response = await request.post(`${BASE_URL_DEV}/api/cart`, {
       params: { currencyCode: DEFAULT_CURRENCY },
       data: {
-        userId: PURCHASE_LIFECYCLE_SESSION_ID,
+        userId: SESSION_ID,
         item: { productId: PRODUCT_ID, quantity: QUANTITY },
       },
     })
@@ -65,7 +67,7 @@ test('checkout lifecycle', async ({ request }) => {
     const response = await request.post(`${BASE_URL_DEV}/api/checkout`, {
       params: { currencyCode: DEFAULT_CURRENCY },
       data: {
-        userId: PURCHASE_LIFECYCLE_SESSION_ID,
+        userId: SESSION_ID,
         userCurrency: DEFAULT_CURRENCY,
         email: EMAIL,
         address: ADDRESS,
