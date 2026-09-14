@@ -21,53 +21,53 @@ npx checkly deploy           # deploy to Checkly
 
 ### Catalog
 
-| Check | Type | What it validates |
-|-------|------|-------------------|
-| Product catalogue loads | API | `GET /api/products` returns the catalogue, known IDs present |
-| Single product loads | API | `GET /api/products/{id}` returns the seeded product |
-| Unknown product is handled | API | Unknown ID returns **500, not 404** |
-| Catalogue rejects bad methods | API | `POST` rejected with 405 |
+| Check | Type | Negative | Frequency | What it validates |
+|-------|------|----------|-----------|-------------------|
+| Product catalogue loads | API | — | 5m | `GET /api/products` returns the catalogue, known IDs present |
+| Single product loads | API | — | 5m | `GET /api/products/{id}` returns the seeded product |
+| Unknown product is handled | API | Yes | 10m | Unknown ID returns **500, not 404** |
+| Catalogue rejects bad methods | API | Yes | 10m | `POST` rejected with 405 |
 
 ### Cart
 
-| Check | Type | What it validates |
-|-------|------|-------------------|
-| Cart contents load | API | `GET /api/cart` returns a hydrated cart (seeded via setup script) |
-| Item added to cart | API | `POST /api/cart` adds a line |
-| Cart emptied | API | `DELETE /api/cart` returns 204 |
-| Wrong identity returns empty cart | API | `userId` instead of `sessionId` silently returns 200 + empty cart |
-| Malformed cart write rejected | API | Body without `userId`/`item` returns 500 |
-| Cart lifecycle | MultiStep | cart empty → add to cart → cart not empty → delete → empty |
+| Check | Type | Negative | Frequency | What it validates |
+|-------|------|----------|-----------|-------------------|
+| Cart contents load | API | — | 5m | `GET /api/cart` returns a hydrated cart (seeded via setup script) |
+| Item added to cart | API | — | 5m | `POST /api/cart` adds a line |
+| Cart emptied | API | — | 5m | `DELETE /api/cart` returns 204 |
+| Wrong identity returns empty cart | API | Yes | 10m | `userId` instead of `sessionId` silently returns 200 + empty cart |
+| Malformed cart write rejected | API | Yes | 10m | Body without `userId`/`item` returns 500 |
+| Cart lifecycle | MultiStep | — | 5m | cart empty → add to cart → cart not empty → delete → empty |
 
 ### Checkout
 
-| Check | Type | What it validates |
-|-------|------|-------------------|
-| Order placed successfully | API | Order placed, 7-service fan-out |
-| Payment declined — invalid card | API | Invalid card returns **422 `PAYMENT_FAILED`** |
-| Payment declined — expired card | API | Expired card returns **422 `PAYMENT_FAILED`** |
-| Order with empty cart fails | API | Empty cart returns 500 |
-| Order with bad identity fails | API | `user_id` instead of `userId` returns 500 |
-| Checkout rejects bad methods | API | `GET` rejected with 405 |
-| Purchase flow | MultiStep | browse → add to cart → purchase → cart emptied |
+| Check | Type | Negative | Frequency | What it validates |
+|-------|------|----------|-----------|-------------------|
+| Order placed successfully | API | — | 5m | Order placed, 7-service fan-out |
+| Payment declined — invalid card | API | Yes | 10m | Invalid card returns **422 `PAYMENT_FAILED`** |
+| Payment declined — expired card | API | Yes | 10m | Expired card returns **422 `PAYMENT_FAILED`** |
+| Order with empty cart fails | API | Yes | 10m | Empty cart returns 500 |
+| Order with bad identity fails | API | Yes | 10m | `user_id` instead of `userId` returns 500 |
+| Checkout rejects bad methods | API | Yes | 10m | `GET` rejected with 405 |
+| Purchase flow | MultiStep | — | 5m | browse → add to cart → purchase → cart emptied |
 
 ### Ancillary
 
-| Check | Type | What it validates |
-|-------|------|-------------------|
-| Currency list available | API | `GET /api/currency` |
-| Shipping quote returned | API | `GET /api/shipping` |
-| Recommendations returned | API | `GET /api/recommendations` |
-| Contextual ads returned | API | `GET /api/data` returns contextual ads |
-| Recommendations rejects bad methods | API | `POST` rejected with 405 |
-| Ads rejects bad methods | API | `POST` rejected with 405 |
+| Check | Type | Negative | Frequency | What it validates |
+|-------|------|----------|-----------|-------------------|
+| Currency list available | API | — | 5m | `GET /api/currency` |
+| Shipping quote returned | API | — | 5m | `GET /api/shipping` |
+| Recommendations returned | API | — | 5m | `GET /api/recommendations` |
+| Contextual ads returned | API | — | 5m | `GET /api/data` returns contextual ads |
+| Recommendations rejects bad methods | API | Yes | 10m | `POST` rejected with 405 |
+| Ads rejects bad methods | API | Yes | 10m | `POST` rejected with 405 |
 
 ### UI journeys
 
-| Check | Type | What it validates |
-|-------|------|-------------------|
-| Homepage health | Browser | Store homepage renders the product list |
-| Full purchase journey | Browser | Homepage → product → cart → order → confirmation |
+| Check | Type | Negative | Frequency | What it validates                                    |
+|-------|------|----------|-----------|------------------------------------------------------|
+| Homepage health | Browser | — | 5m | Store homepage renders the product list              |
+| Full purchase journey | Browser | — | 5m | Homepage -> product -> cart -> order -> confirmation |
 
 ## Checkly private location agent
 
