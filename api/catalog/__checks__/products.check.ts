@@ -1,10 +1,12 @@
 import { ApiCheck, Frequency, AssertionBuilder, QueryParam } from 'checkly/constructs'
+import { productCatalogue } from '../../../checkly.groups'
 import { DEFAULT_CURRENCY, PRODUCT_ID, jsonHeader } from '../../../checkly.fixtures'
 
 new ApiCheck('products-list', {
   name: 'GET /api/products - catalogue',
   description: "List all the product catalog",
   tags: ['api', 'catalog', 'critical'],
+  group: productCatalogue,
   degradedResponseTime: 1000,
   maxResponseTime: 2000,
   request: {
@@ -26,6 +28,7 @@ new ApiCheck('products-list-method-not-allowed', {
   name: 'POST /api/products - 405 method not allowed',
   description: "Reject an unsupported method on the catalog route",
   tags: ['api', 'catalog', 'negative'],
+  group: productCatalogue,
   frequency: Frequency.EVERY_10M,
   shouldFail: true,
   degradedResponseTime: 1000,

@@ -1,4 +1,5 @@
 import { ApiCheck, Frequency, AssertionBuilder, QueryParam } from 'checkly/constructs'
+import { shoppingCart } from '../../../checkly.groups'
 import { DEFAULT_CURRENCY, PRODUCT_ID, QUANTITY, jsonHeader } from '../../../checkly.fixtures'
 
 const ADD_ITEM_BODY = {
@@ -17,6 +18,7 @@ new ApiCheck('cart-add-item', {
   name: 'POST /api/cart - add item',
   description: "Add an item to the cart for a session",
   tags: ['api', 'cart', 'critical'],
+  group: shoppingCart,
   degradedResponseTime: 1500,
   maxResponseTime: 3000,
   request: {
@@ -40,6 +42,7 @@ new ApiCheck('cart-add-item-malformed-body', {
   name: 'POST /api/cart - 500 on malformed body',
   description: "A body missing userId and item fails the cart write",
   tags: ['api', 'cart', 'negative'],
+  group: shoppingCart,
   frequency: Frequency.EVERY_10M,
   shouldFail: true,
   degradedResponseTime: 1500,

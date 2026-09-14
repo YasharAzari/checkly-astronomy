@@ -1,10 +1,12 @@
 import { ApiCheck, AssertionBuilder } from 'checkly/constructs'
+import { supportingServices } from '../../../checkly.groups'
 import { DEFAULT_CURRENCY, jsonHeader } from '../../../checkly.fixtures'
 
 new ApiCheck('currency-list', {
   name: 'GET /api/currency - supported currencies',
   description: "List the supported ISO-4217 currency codes",
   tags: ['api', 'addons', 'critical'],
+  group: supportingServices,
   degradedResponseTime: 1000,
   maxResponseTime: 2000,
   request: {

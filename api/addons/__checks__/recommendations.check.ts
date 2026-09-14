@@ -1,4 +1,5 @@
 import { ApiCheck, Frequency, AssertionBuilder, QueryParam } from 'checkly/constructs'
+import { supportingServices } from '../../../checkly.groups'
 import { DEFAULT_CURRENCY, PRODUCT_ID, jsonHeader } from '../../../checkly.fixtures'
 
 const SEED_PRODUCT_IDS = [PRODUCT_ID]
@@ -7,6 +8,7 @@ new ApiCheck('recommendations-list', {
   name: 'GET /api/recommendations - recommended products',
   description: "Fetch recommendations seeded from a known product",
   tags: ['api', 'addons'],
+  group: supportingServices,
   degradedResponseTime: 10000,
   maxResponseTime: 20000,
   request: {
@@ -31,6 +33,7 @@ new ApiCheck('recommendations-method-not-allowed', {
   name: 'POST /api/recommendations - 405 method not allowed',
   description: "Reject an unsupported method on the recommendations route",
   tags: ['api', 'addons', 'negative'],
+  group: supportingServices,
   frequency: Frequency.EVERY_10M,
   shouldFail: true,
   degradedResponseTime: 1000,

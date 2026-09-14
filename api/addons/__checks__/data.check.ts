@@ -1,4 +1,5 @@
 import { ApiCheck, Frequency, AssertionBuilder, QueryParam } from 'checkly/constructs'
+import { supportingServices } from '../../../checkly.groups'
 import { jsonHeader } from '../../../checkly.fixtures'
 
 const CONTEXT_KEYS = ['telescopes']
@@ -7,6 +8,7 @@ new ApiCheck('ads-list', {
   name: 'GET /api/data - contextual ads',
   description: "Fetch contextual ads for a set of context keys",
   tags: ['api', 'addons'],
+  group: supportingServices,
   degradedResponseTime: 1000,
   maxResponseTime: 2000,
   request: {
@@ -29,6 +31,7 @@ new ApiCheck('ads-method-not-allowed', {
   name: 'POST /api/data - 405 method not allowed',
   description: "Reject an unsupported method on the ads route",
   tags: ['api', 'addons', 'negative'],
+  group: supportingServices,
   frequency: Frequency.EVERY_10M,
   shouldFail: true,
   degradedResponseTime: 1000,

@@ -1,4 +1,5 @@
 import { ApiCheck, Frequency, AssertionBuilder, QueryParam } from 'checkly/constructs'
+import { shoppingCart } from '../../../checkly.groups'
 import { DEFAULT_CURRENCY, jsonHeader } from '../../../checkly.fixtures'
 
 const WRONG_IDENTITY_KEY = 'userId'
@@ -7,6 +8,7 @@ new ApiCheck('cart-get', {
   name: 'GET /api/cart - read cart',
   description: "Read the hydrated cart for a session",
   tags: ['api', 'cart', 'critical'],
+  group: shoppingCart,
   setupScript: {
     entrypoint: './seed-cart.setup.ts',
   },
@@ -34,6 +36,7 @@ new ApiCheck('cart-get-wrong-param', {
   name: 'GET /api/cart - wrong identity param returns an empty cart',
   description: "Sending userId instead of sessionId silently yields 200 with an empty cart",
   tags: ['api', 'cart', 'negative'],
+  group: shoppingCart,
   frequency: Frequency.EVERY_10M,
   degradedResponseTime: 1500,
   maxResponseTime: 3000,
