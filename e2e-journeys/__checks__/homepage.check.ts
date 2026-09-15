@@ -1,5 +1,5 @@
 import { BrowserCheck } from 'checkly/constructs'
-import { webStorefront } from '../../../checkly.groups'
+import { webStorefront } from '../../checkly.groups'
 
 new BrowserCheck('homepage-journey', {
   name: 'Homepage - healthcheck',

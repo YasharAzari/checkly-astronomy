@@ -106,7 +106,7 @@ Don't hesitate to change it if the demo stack is running publicly in production 
 │   ├── checkout/__checks__/          
 │   └── addons/__checks__/
 ├── e2e-journeys/                     # synthetic real user journeys on the store UI
-│   └── catalog/__checks__/
+│   └── __checks__/
 ├── .github/workflows/                # manual github actions: validate, test and deploy monitors
 ├── private-location/                 # Checkly Agent container
 ├── assets/                           
